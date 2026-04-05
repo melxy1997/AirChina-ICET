@@ -213,7 +213,7 @@ WorkingPaper 自动生成 ──► Excel 导出归档
 |------|------|------|
 | Agent 框架 | LangGraph.js | 状态图管理 Agent 执行，支持断点续传 |
 | LLM SDK | LangChain.js | 统一 LLM 调用接口，可切换模型 |
-| 默认 LLM | OpenAI GPT-4o | 视觉能力强，PDF 图像分析 |
+| 默认 LLM | Qwen 2.5 VL | 视觉能力强，PDF 图像分析 |
 | 可替换 LLM | Claude 3.5 / 本地模型 | 通过 LangChain 适配器切换 |
 | PDF 文本提取 | pdf-parse | 原生 PDF 文本层提取 |
 | OCR | Tesseract.js | 扫描件 / 图像文字识别 |
@@ -363,7 +363,7 @@ JWT_EXPIRES_IN="7d"
 # ── AI / LLM ─────────────────────────────────────────
 OPENAI_API_KEY="sk-..."
 # ANTHROPIC_API_KEY="sk-ant-..."   # 可选，替代 LLM
-LLM_MODEL="gpt-4o"                 # 默认模型
+LLM_MODEL="Qwen-2.5-VL"                 # 默认模型
 
 # ── 服务端口 ──────────────────────────────────────────
 PORT=3001

@@ -626,7 +626,7 @@ interface AIJob {
   status: AIJobStatus;
   // 执行信息
   agentType: 'REGULATION_PARSER' | 'PLAN_GENERATOR' | 'SAMPLE_PARSER' | 'TEST_EXECUTOR';
-  modelUsed?: string;           // 使用的模型，如"gpt-4o"
+  modelUsed?: string;           // 使用的模型，如"Qwen-2.5-VL"
   tokensUsed?: number;
   durationMs?: number;
   // 进度
@@ -1508,7 +1508,7 @@ interface Observation {
  * 输出: 有序的检查子任务列表
  */
 async function planNode(state: ExecutorState): Promise<Partial<ExecutorState>> {
-  const llm = new ChatOpenAI({ model: 'gpt-4o', temperature: 0 });
+  const llm = new ChatOpenAI({ model: 'Qwen-2.5-VL', temperature: 0 });
   
   const response = await llm.invoke([
     { role: 'system', content: `你是内部控制评价测试专家。
@@ -1537,7 +1537,7 @@ async function executeNode(state: ExecutorState): Promise<Partial<ExecutorState>
     compareValuesTool,    // 比较两个值
   ];
   
-  const llm = new ChatOpenAI({ model: 'gpt-4o', temperature: 0 }).bindTools(tools);
+  const llm = new ChatOpenAI({ model: 'Qwen-2.5-VL', temperature: 0 }).bindTools(tools);
   
   const currentTask = state.plan[state.currentPlanStep];
   const response = await llm.invoke([
@@ -1561,7 +1561,7 @@ async function executeNode(state: ExecutorState): Promise<Partial<ExecutorState>
  * Judge节点：综合所有观察，做出最终判断
  */
 async function judgeNode(state: ExecutorState): Promise<Partial<ExecutorState>> {
-  const llm = new ChatOpenAI({ model: 'gpt-4o', temperature: 0 });
+  const llm = new ChatOpenAI({ model: 'Qwen-2.5-VL', temperature: 0 });
   
   const response = await llm.invoke([
     { role: 'system', content: `你是内部控制评价测试专家。
@@ -1721,7 +1721,7 @@ export const extractFieldTool = tool(
 | **文件存储** | MinIO（本地）/ S3（生产） | 兼容S3接口，可平滑迁移 |
 | **消息队列** | BullMQ + Redis | AI任务异步处理，进度追踪 |
 | **AI框架** | LangGraph.js | 状态图管理Agent，支持断点续传 |
-| **LLM** | OpenAI GPT-4o | 视觉能力强（PDF图像分析），可替换 |
+| **LLM** | Qwen 2.5 VL | 视觉能力强（PDF图像分析），可替换 |
 | **PDF处理** | pdf-parse + Tesseract.js | 文本提取+OCR |
 | **Excel生成** | SheetJS (xlsx) | 已验证，前后端通用 |
 | **实时通信** | Socket.io | AI进度推送 |
