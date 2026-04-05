@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>内部控制评价测试工作底稿</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --primary:#1a56db;--primary-light:#e8f0fe;--primary-dark:#1240a8;
+  --success:#0e9f6e;--danger:#e02424;--warning:#ff9800;
+  --gray-50:#f9fafb;--gray-100:#f3f4f6;--gray-200:#e5e7eb;
+  --gray-300:#d1d5db;--gray-400:#9ca3af;--gray-600:#4b5563;
+  --gray-700:#374151;--gray-800:#1f2937;
+  --radius:8px;--shadow:0 1px 3px rgba(0,0,0,.1);
+  --shadow-md:0 4px 6px rgba(0,0,0,.07);--transition:all .2s ease
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:#eef2f7;color:var(--gray-800);min-height:100vh;padding:24px 16px 60px}
+.page-header{text-align:center;margin-bottom:32px}
+.page-header h1{font-size:24px;font-weight:700;color:var(--primary-dark);margin-bottom:6px}
+.page-header p{color:var(--gray-600);font-size:14px}
+.form-container{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+.card{background:#fff;border-radius:12px;box-shadow:var(--shadow-md);overflow:hidden}
+.card-header{display:flex;align-items:center;gap:10px;padding:14px 20px;background:linear-gradient(135deg,var(--primary) 0%,#2563eb 100%);color:#fff}
+.card-header .snum{width:26px;height:26px;background:rgba(255,255,255,.25);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.card-header h2{font-size:15px;font-weight:600;letter-spacing:.3px}
+.card-body{padding:20px}
+.form-grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+.span-full{grid-column:1/-1}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group label{font-size:13px;font-weight:600;color:var(--gray-700);display:flex;align-items:center;gap:4px}
+.req{color:var(--danger);font-size:14px;line-height:1}
+.form-group input,.form-group select,.form-group textarea{padding:8px 12px;border:1.5px solid var(--gray-200);border-radius:var(--radius);font-size:14px;color:var(--gray-800);background:var(--gray-50);transition:var(--transition);font-family:inherit;width:100%}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--primary);background:#fff;box-shadow:0 0 0 3px rgba(26,86,219,.1)}
+.form-group textarea{resize:vertical;min-height:100px;line-height:1.6}
+.readonly-display{padding:8px 12px;border:1.5px solid var(--gray-200);border-radius:var(--radius);font-size:14px;background:var(--gray-100);color:var(--gray-600);display:flex;align-items:center;gap:8px;min-height:38px}
+.readonly-display .count-val{font-size:20px;font-weight:700;color:var(--primary);min-width:28px;text-align:center}
+.readonly-display .count-hint{font-size:12px;color:var(--gray-400)}
+.dynamic-list{display:flex;flex-direction:column;gap:10px}
+.dynamic-item{display:flex;align-items:flex-start;gap:8px;background:var(--gray-50);border:1.5px solid var(--gray-200);border-radius:var(--radius);padding:10px 12px;transition:var(--transition)}
+.dynamic-item:hover{border-color:var(--primary);background:var(--primary-light)}
+.item-badge{min-width:26px;height:26px;background:var(--primary);color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:1px}
+.dynamic-item textarea{flex:1;border:none;background:transparent;font-size:14px;color:var(--gray-800);padding:2px 0;font-family:inherit;outline:none;resize:none;min-height:28px}
+.btn-icon{width:28px;height:28px;border:none;cursor:pointer;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;transition:var(--transition);flex-shrink:0}
+.btn-remove{background:#fee2e2;color:var(--danger)}
+.btn-remove:hover{background:var(--danger);color:#fff}
+.btn-add{display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;border:1.5px dashed var(--primary);border-radius:var(--radius);background:var(--primary-light);color:var(--primary);cursor:pointer;font-size:13px;font-weight:600;transition:var(--transition);width:100%;margin-top:8px;font-family:inherit}
+.btn-add:hover{background:var(--primary);color:#fff;border-style:solid}
+.sample-wrap{overflow-x:auto;border-radius:var(--radius);border:1.5px solid var(--gray-200)}
+.sample-tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:600px}
+.sample-tbl th{background:var(--gray-100);padding:8px 10px;text-align:center;font-weight:600;color:var(--gray-700);border:1px solid var(--gray-200);white-space:nowrap}
+.sample-tbl th.step-h{background:#dbeafe;color:var(--primary-dark);max-width:160px;font-size:11px;white-space:normal;line-height:1.4;font-weight:600}
+.sample-tbl td{padding:5px 6px;border:1px solid var(--gray-200);text-align:center;vertical-align:middle}
+.sample-tbl tr:hover td{background:var(--gray-50)}
+.sample-tbl input[type=text],.sample-tbl input[type=number]{width:100%;border:1px solid var(--gray-200);border-radius:5px;padding:4px 6px;font-size:13px;background:#fff;font-family:inherit;transition:var(--transition);text-align:center}
+.sample-tbl input[type=text]:focus,.sample-tbl input[type=number]:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(26,86,219,.1)}
+.content-inp{text-align:left!important;min-width:160px}
+.sr-sel{display:flex;gap:3px;justify-content:center}
+.sr-sel button{width:32px;height:26px;border:1.5px solid var(--gray-200);border-radius:5px;cursor:pointer;font-size:12px;font-weight:700;background:#fff;color:var(--gray-600);transition:var(--transition);flex-shrink:0;font-family:inherit}
+.sr-sel button.ap{background:#d1fae5;border-color:var(--success);color:var(--success)}
+.sr-sel button.af{background:#fee2e2;border-color:var(--danger);color:var(--danger)}
+.sr-sel button.an{background:#fef9c3;border-color:var(--warning);color:#b45309}
+.sr-sel button:hover{transform:scale(1.1)}
+.ano-wrap{overflow-x:auto}
+.ano-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.ano-tbl th{background:#fef3c7;padding:8px 10px;font-weight:600;color:var(--gray-700);border:1px solid #fde68a;text-align:center}
+.ano-tbl td{padding:5px 6px;border:1px solid var(--gray-200)}
+.ano-tbl input[type=text]{width:100%;border:1px solid var(--gray-200);border-radius:5px;padding:4px 6px;font-size:13px;font-family:inherit}
+.ano-tbl input:focus{outline:none;border-color:var(--warning)}
+.hint{font-size:12px;color:var(--gray-400);padding:3px 0 0 2px}
+.submit-area{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;padding:8px 0 16px}
+.btn-preview{padding:12px 32px;border:2px solid var(--primary);border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;background:#fff;color:var(--primary);transition:var(--transition);display:flex;align-items:center;gap:8px;font-family:inherit}
+.btn-preview:hover{background:var(--primary-light)}
+.btn-export{padding:12px 40px;background:linear-gradient(135deg,#1a56db 0%,#1d4ed8 100%);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(26,86,219,.35);transition:var(--transition);display:flex;align-items:center;gap:8px;font-family:inherit}
+.btn-export:hover{background:linear-gradient(135deg,#1240a8 0%,#1e40af 100%);box-shadow:0 6px 20px rgba(26,86,219,.45);transform:translateY(-1px)}
+.btn-export:active{transform:translateY(0)}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--gray-800);color:#fff;padding:12px 24px;border-radius:50px;font-size:14px;opacity:0;transition:all .35s ease;pointer-events:none;z-index:9999;display:flex;align-items:center;gap:8px}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.success{background:var(--success)}
+.toast.error{background:var(--danger)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:8888;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;border-radius:14px;max-width:920px;width:100%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,.25)}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--gray-200);background:var(--gray-50)}
+.modal-header h3{font-size:16px;font-weight:700}
+.btn-close{width:32px;height:32px;border:none;background:var(--gray-200);border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;transition:var(--transition);color:var(--gray-600)}
+.btn-close:hover{background:var(--danger);color:#fff}
+.modal-body{padding:20px;overflow-y:auto;flex:1}
+.ps{margin-bottom:20px}
+.ps h4{font-size:13px;font-weight:700;color:var(--primary);border-left:3px solid var(--primary);padding-left:8px;margin-bottom:10px}
+.pkv{display:grid;grid-template-columns:120px 1fr;gap:6px 12px;font-size:13px}
+.pkv dt{color:var(--gray-600);font-weight:500}
+.pkv dd{color:var(--gray-800)}
+.ptbl{width:100%;border-collapse:collapse;font-size:12px}
+.ptbl th,.ptbl td{border:1px solid var(--gray-200);padding:5px 8px;text-align:center}
+.ptbl th{background:var(--gray-100);font-weight:600}
+@media(max-width:640px){.g2,.g3,.g4{grid-template-columns:1fr}body{padding:12px 10px 60px}}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>📋 内部控制评价测试工作底稿</h1>
+  <p>填写以下信息后，点击「导出 Excel」生成标准格式文件</p>
+</div>
+
+<div class="form-container">
+
+  <!-- §1 基础信息 -->
+  <div class="card">
+    <div class="card-header"><span class="snum">1</span><h2>基础信息</h2></div>
+    <div class="card-body">
+      <div class="form-grid g3">
+        <div class="form-group">
+          <label>测试单位名称 <span class="req">*</span></label>
+          <input type="text" id="unitName" value="大连航空有限责任公司"/>
+        </div>
+        <div class="form-group">
+          <label>测试底稿编号 <span class="req">*</span></label>
+          <input type="text" id="paperId" value="机供品TOC-01"/>
+        </div>
+        <div class="form-group">
+          <label>完成日期 <span class="req">*</span></label>
+          <input type="text" id="completionDate" value="2025.10.17"/>
+        </div>
+        <div class="form-group">
+          <label>测试执行人 <span class="req">*</span></label>
+          <input type="text" id="tester" value="刘圣好"/>
+        </div>
+        <div class="form-group">
+          <label>测试审阅人</label>
+          <input type="text" id="reviewer" value="景然"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- §2 流程信息 -->
+  <div class="card">
+    <div class="card-header"><span class="snum">2</span><h2>流程信息</h2></div>
+    <div class="card-body">
+      <div class="form-grid g3">
+        <div class="form-group">
+          <label>一级流程 <span class="req">*</span></label>
+          <input type="text" id="process1" value="采购与资产管理-餐食、机上供应品_机供品采购"/>
+        </div>
+        <div class="form-group">
+          <label>二级流程</label>
+          <input type="text" id="process2" value="餐食、机上供应品"/>
+        </div>
+        <div class="form-group">
+          <label>三级流程</label>
+          <input type="text" id="process3" value="NA"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- §3 抽样标准 -->
+  <div class="card">
+    <div class="card-header"><span class="snum">3</span><h2>抽样标准</h2></div>
+    <div class="card-body">
+      <div class="form-grid g4">
+        <div class="form-group">
+          <label>抽样方法 <span class="req">*</span></label>
+          <select id="samplingMethod">
+            <option value="随机抽样" selected>随机抽样</option>
+            <option value="系统抽样">系统抽样</option>
+            <option value="判断抽样">判断抽样</option>
+            <option value="全量检查">全量检查</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>抽样期间 <span class="req">*</span></label>
+          <input type="text" id="samplingPeriod" value="2025年1月至10月"/>
+        </div>
+        <div class="form-group">
+          <label>样本数量</label>
+          <div class="readonly-display">
+            <span class="count-val" id="sampleCountValue">1</span>
+            <span class="count-hint">条（自动统计）</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>样本来源</label>
+          <input type="text" id="sampleSource" value="2025年机供品预算"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- §4 控制点描述 -->
+  <div class="card">
+    <div class="card-header"><span class="snum">4</span><h2>控制点描述</h2></div>
+    <div class="card-body">
+      <div class="form-group">
+        <label>内容 <span class="req">*</span></label>
+        <textarea id="controlDesc" rows="10">1. 采购预算的编制
+1.1采购预算的初步拟定
+客服务部供应助理每年年度在当年机供品成本水平的基础上，根据下一年的供应计划调整，制定机供品预算调整计划，初步制定出下一年的调整预算，经过客舱服务部总经理审批签字后递交规划财务部逐级上报执行预算审批。（C1）
+
+1.2采购预算的确认与调整
+客舱服务部供应助理根据公司实际下发的预算与综合保障部仓储保障岗，仓储单位协调、修定采购工作计划，调整日常进货量。
+年度中期，客服务部供应助理根据半年来的实际采购情况，编制年中预算调整申请，报送客服务部高级经理复核后递交规划财务部逐级上报执行预算审批。（C2）</textarea>
+        <span class="hint">💡 支持多段落，建议标注控制编号如 (C1)(C2)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- §5 测试结果 -->
+  <div class="card">
+    <div class="card-header"><span class="snum">5</span><h2>测试结果</h2></div>
+    <div class="card-body">
+      <div class="form-grid g2">
+        <div class="form-group">
+          <label>控制编号</label>
+          <input type="text" id="controlIds" value="C1、C2"/>
+        </div>
+        <div class="form-group">
+          <label>测试结果</label>
+          <input type="text" id="testResultText" value="无差异"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- §6 测试步骤 -->
+  <div class="card">
+    <div class="card-header"><span class="snum">6</span><h2>测试步骤描述</h2></div>
+    <div class="card-body">
+      <div class="dynamic-list" id="stepList"></div>
+      <button class="btn-add" onclick="addStep()">＋ 添加步骤</button>
+    </div>
+  </div>
+
+  <!-- §7 详细测试记录 -->
+  <div class="card">
+    <div class="card-header"><span class="snum">7</span><h2>详细测试记录</h2></div>
+    <div class="card-body">
+      <div class="sample-wrap">
+        <table class="sample-tbl" id="sampleTable">
+          <thead id="sampleThead"></thead>
+          <tbody id="sampleTbody"></tbody>
+        </table>
+      </div>
+      <button class="btn-add" onclick="addSample()" style="margin-top:10px">＋ 添加样本</button>
+    </div>
+  </div>
+
+  <!-- §8 测试差异情况说明 -->
+  <div class="card">
+    <div class="card-header"><span class="snum" style="background:rgba(255,152,0,.3)">8</span><h2>测试差异情况说明</h2></div>
+    <div class="card-body">
+      <p class="hint" style="margin-bottom:12px">⚠️ 若无差异可不填写，有差异时请逐条录入</p>
+      <div class="ano-wrap">
+        <table class="ano-tbl">
+          <thead>
+            <tr>
+              <th style="min-width:100px">缺陷汇总表序号</th>
+              <th style="min-width:220px">情况说明</th>
+              <th style="min-width:80px">步骤号</th>
+              <th style="min-width:80px">样本序号</th>
+              <th style="min-width:160px">支持性文档名称</th>
+              <th style="width:70px">操作</th>
+            </tr>
+          </thead>
+          <tbody id="anomalyBody"></tbody>
+        </table>
+      </div>
+      <button class="btn-add" onclick="addAnomaly()">＋ 添加差异记录</button>
+    </div>
+  </div>
+
+  <!-- 操作按钮 -->
+  <div class="submit-area">
+    <button class="btn-preview" onclick="showPreview()">👁 预览数据</button>
+    <button class="btn-export" onclick="exportExcel()">📥 导出 Excel</button>
+  </div>
+
+</div>
+
+<!-- 预览弹窗 -->
+<div class="modal-overlay" id="previewModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>📋 数据预览</h3>
+      <button class="btn-close" onclick="closePreview()">✕</button>
+    </div>
+    <div class="modal-body" id="previewBody"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+//  STATE
+// ============================================================
+let steps = [
+  '查看机供品年度预算编制是否依据当年机供品成本水平制定。',
+  '查看预算编制是否经过客舱服务部总经理审批签字后报规划财务部。',
+  '查看是否根据中期预算调整要求编制年中预算调整申请。'
+];
+let samples = [
+  { no: 1, content: '2025年机供品采购计划', stepResults: ['✓','✓','N/A'], remark: '' }
+];
+let anomalies = [];
+
+// ============================================================
+//  UTILS
+// ============================================================
+function v(id){ const e=document.getElementById(id); return e?e.value.trim():'' }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function showToast(msg,type='info'){
+  const t=document.getElementById('toast');
+  const icons={success:'✅',error:'❌',info:'ℹ️'};
+  t.textContent=(icons[type]||'')+' '+msg;
+  t.className='toast '+type+' show';
+  setTimeout(()=>t.classList.remove('show'),3000)
+}
+
+// ============================================================
+//  STEPS
+// ============================================================
+function addStep(text=''){
+  steps.push(text);
+  renderSteps();
+  renderSampleTable();
+}
+function removeStep(idx){
+  if(steps.length<=1){showToast('至少保留一个步骤','error');return}
+  steps.splice(idx,1);
+  samples.forEach(s=>s.stepResults.splice(idx,1));
+  renderSteps();
+  renderSampleTable();
+}
+function renderSteps(){
+  document.getElementById('stepList').innerHTML=steps.map((s,i)=>`
+    <div class="dynamic-item">
+      <span class="item-badge">S${i+1}</span>
+      <textarea rows="1" style="overflow:hidden;resize:none"
+        oninput="steps[${i}]=this.value;autoResize(this);renderSampleTable()"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addStep()}"
+      >${esc(s)}</textarea>
+      <button class="btn-icon btn-remove" onclick="removeStep(${i})">✕</button>
+    </div>`).join('');
+  document.querySelectorAll('#stepList textarea').forEach(autoResize);
+}
+function autoResize(el){ el.style.height='auto'; el.style.height=el.scrollHeight+'px' }
+
+// ============================================================
+//  SAMPLES
+// ============================================================
+function addSample(){
+  const no=samples.length?samples[samples.length-1].no+1:1;
+  samples.push({no,content:'',stepResults:new Array(steps.length).fill('✓'),remark:''});
+  renderSampleTable();
+}
+function removeSample(idx){
+  if(samples.length<=1){showToast('至少保留一条样本','error');return}
+  samples.splice(idx,1);
+  renderSampleTable();
+}
+function setStepResult(si,ti,val){
+  if(!samples[si].stepResults)samples[si].stepResults=[];
+  samples[si].stepResults[ti]=val;
+  renderSampleTable();
+}
+function syncSampleCount(){
+  const el=document.getElementById('sampleCountValue');
+  if(el)el.textContent=samples.length;
+}
+function renderSampleTable(){
+  const thead=document.getElementById('sampleThead');
+  const tbody=document.getElementById('sampleTbody');
+  // 同步 stepResults 长度
+  samples.forEach(s=>{
+    if(!s.stepResults)s.stepResults=[];
+    while(s.stepResults.length<steps.length)s.stepResults.push('✓');
+    s.stepResults.length=steps.length;
+  });
+  // thead
+  const stepCols=steps.map((s,i)=>`<th class="step-h">步骤${i+1}<br><span style="font-weight:400">${s.length>28?s.slice(0,28)+'…':s}</span></th>`).join('');
+  thead.innerHTML=`
+    <tr>
+      <th rowspan="2" style="width:60px">样本序号</th>
+      <th rowspan="2" style="min-width:160px">样本描述<br><span style="font-weight:400;font-size:11px">内容</span></th>
+      <th colspan="${steps.length}">测试结果</th>
+      <th rowspan="2" style="width:80px">备注</th>
+      <th rowspan="2" style="width:46px">操作</th>
+    </tr>
+    <tr>${stepCols}</tr>`;
+  // tbody
+  tbody.innerHTML=samples.map((s,si)=>{
+    const stepCells=steps.map((_,ti)=>{
+      const cur=(s.stepResults||[])[ti]||'✓';
+      return `<td><div class="sr-sel">
+        <button class="${cur==='✓'?'ap':''}" onclick="setStepResult(${si},${ti},'✓')">✓</button>
+        <button class="${cur==='×'?'af':''}" onclick="setStepResult(${si},${ti},'×')">×</button>
+        <button class="${cur==='N/A'?'an':''}" onclick="setStepResult(${si},${ti},'N/A')">N/A</button>
+      </div></td>`;
+    }).join('');
+    return `<tr>
+      <td><input type="number" value="${s.no}" min="1" oninput="samples[${si}].no=+this.value" style="width:46px"></td>
+      <td><input type="text" class="content-inp" value="${esc(s.content)}" oninput="samples[${si}].content=this.value" placeholder="样本描述"></td>
+      ${stepCells}
+      <td><input type="text" value="${esc(s.remark||'')}" oninput="samples[${si}].remark=this.value" placeholder="备注"></td>
+      <td><button class="btn-icon btn-remove" onclick="removeSample(${si})">✕</button></td>
+    </tr>`;
+  }).join('');
+  syncSampleCount();
+}
+
+// ============================================================
+//  ANOMALIES
+// ============================================================
+function addAnomaly(){
+  anomalies.push({findingNo:'',description:'',stepNo:'',sampleNo:'',supportingDoc:''});
+  renderAnomalies();
+}
+function removeAnomaly(idx){ anomalies.splice(idx,1); renderAnomalies() }
+function renderAnomalies(){
+  document.getElementById('anomalyBody').innerHTML=anomalies.map((a,i)=>`
+    <tr>
+      <td><input type="text" value="${esc(a.findingNo)}" oninput="anomalies[${i}].findingNo=this.value" placeholder="序号"></td>
+      <td><input type="text" value="${esc(a.description)}" oninput="anomalies[${i}].description=this.value" placeholder="情况描述"></td>
+      <td><input type="text" value="${esc(a.stepNo)}" oninput="anomalies[${i}].stepNo=this.value" placeholder="步骤号"></td>
+      <td><input type="text" value="${esc(a.sampleNo)}" oninput="anomalies[${i}].sampleNo=this.value" placeholder="样本序号"></td>
+      <td><input type="text" value="${esc(a.supportingDoc)}" oninput="anomalies[${i}].supportingDoc=this.value" placeholder="文档名称"></td>
+      <td style="text-align:center"><button class="btn-icon btn-remove" onclick="removeAnomaly(${i})">✕</button></td>
+    </tr>`).join('');
+}
+
+// ============================================================
+//  COLLECT DATA
+// ============================================================
+function collectData(){
+  return {
+    documentName:'内部控制评价测试工作底稿',
+    unitName:v('unitName'),
+    process1:v('process1'),process2:v('process2'),process3:v('process3'),
+    paperId:v('paperId'),tester:v('tester'),reviewer:v('reviewer'),
+    completionDate:v('completionDate'),
+    sampling:{
+      method:v('samplingMethod'),period:v('samplingPeriod'),
+      sampleCount:samples.length,
+      sampleSource:v('sampleSource')
+    },
+    controlDesc:v('controlDesc'),
+    testResult:{controlIds:v('controlIds'),result:v('testResultText')},
+    steps:[...steps],
+    samples:samples.map(s=>({...s,stepResults:[...(s.stepResults||[])]})),
+    anomalies:[...anomalies]
+  }
+}
+function validate(d){
+  if(!d.unitName)return'请填写测试单位名称';
+  if(!d.paperId)return'请填写测试底稿编号';
+  if(!d.tester)return'请填写测试执行人';
+  if(!d.completionDate)return'请填写完成日期';
+  if(!d.process1)return'请填写一级流程';
+  if(!d.controlDesc)return'请填写控制点描述';
+  if(d.steps.some(s=>!s.trim()))return'步骤描述不能为空';
+  return null;
+}
+
+// ============================================================
+//  PREVIEW
+// ============================================================
+function showPreview(){
+  const d=collectData(); const err=validate(d);
+  if(err){showToast(err,'error');return}
+  const sHead=`<tr><th>序号</th><th>内容</th>${d.steps.map((_,i)=>`<th>步骤${i+1}</th>`).join('')}<th>备注</th></tr>`;
+  const sRows=d.samples.map(s=>`<tr><td>${s.no}</td><td style="text-align:left">${esc(s.content)}</td>${(s.stepResults||[]).map(r=>`<td>${r}</td>`).join('')}<td>${esc(s.remark||'')}</td></tr>`).join('');
+  const aRows=d.anomalies.length
+    ?`<table class="ptbl"><tr><th>缺陷序号</th><th>情况说明</th><th>步骤号</th><th>样本序号</th><th>支持性文档</th></tr>${d.anomalies.map(a=>`<tr><td>${esc(a.findingNo)}</td><td>${esc(a.description)}</td><td>${esc(a.stepNo)}</td><td>${esc(a.sampleNo)}</td><td>${esc(a.supportingDoc)}</td></tr>`).join('')}</table>`
+    :`<p style="color:var(--gray-400);font-size:13px">（无差异记录）</p>`;
+  document.getElementById('previewBody').innerHTML=`
+    <div class="ps"><h4>基础信息</h4><dl class="pkv"><dt>单位名称</dt><dd>${esc(d.unitName)}</dd><dt>底稿编号</dt><dd>${esc(d.paperId)}</dd><dt>执行人</dt><dd>${esc(d.tester)}</dd><dt>审阅人</dt><dd>${esc(d.reviewer||'—')}</dd><dt>完成日期</dt><dd>${esc(d.completionDate)}</dd></dl></div>
+    <div class="ps"><h4>流程信息</h4><dl class="pkv"><dt>一级流程</dt><dd>${esc(d.process1)}</dd><dt>二级流程</dt><dd>${esc(d.process2||'—')}</dd><dt>三级流程</dt><dd>${esc(d.process3)}</dd></dl></div>
+    <div class="ps"><h4>抽样标准</h4><dl class="pkv"><dt>抽样方法</dt><dd>${esc(d.sampling.method)}</dd><dt>抽样期间</dt><dd>${esc(d.sampling.period)}</dd><dt>样本数量</dt><dd>${d.sampling.sampleCount}</dd><dt>样本来源</dt><dd>${esc(d.sampling.sampleSource)}</dd></dl></div>
+    <div class="ps"><h4>测试步骤</h4>${d.steps.map((s,i)=>`<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;font-size:13px"><span style="min-width:22px;height:22px;background:var(--primary);color:#fff;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">S${i+1}</span><span>${esc(s)}</span></div>`).join('')}</div>
+    <div class="ps"><h4>详细测试记录 (${d.samples.length} 条)</h4><div style="overflow-x:auto"><table class="ptbl">${sHead}${sRows}</table></div></div>
+    <div class="ps"><h4>测试差异情况说明</h4>${aRows}</div>`;
+  document.getElementById('previewModal').classList.add('show');
+}
+function closePreview(){ document.getElementById('previewModal').classList.remove('show') }
+
+// ============================================================
+//  EXCEL EXPORT
+// ============================================================
+function exportExcel(){
+  if(typeof XLSX==='undefined'){showToast('SheetJS 库加载失败，请检查网络','error');return}
+  const d=collectData(); const err=validate(d);
+  if(err){showToast(err,'error');return}
+  const wb=XLSX.utils.book_new();
+  const ws=buildSheet(d);
+  XLSX.utils.book_append_sheet(wb,ws,'测试工作底稿');
+  const fn=`内控测试底稿_${d.paperId}_${d.unitName}_${d.completionDate.replace(/\./g,'-')}.xlsx`;
+  XLSX.writeFile(wb,fn);
+  showToast('Excel 文件已生成并下载 ✓','success');
+}
+
+// ─── 样式常量 ───────────────────────────────────────────────
+const BORDER={
+  top:{style:'thin',color:{rgb:'AAAAAA'}},
+  bottom:{style:'thin',color:{rgb:'AAAAAA'}},
+  left:{style:'thin',color:{rgb:'AAAAAA'}},
+  right:{style:'thin',color:{rgb:'AAAAAA'}}
+};
+const BORDER_MED={
+  top:{style:'medium',color:{rgb:'888888'}},
+  bottom:{style:'medium',color:{rgb:'888888'}},
+  left:{style:'medium',color:{rgb:'888888'}},
+  right:{style:'medium',color:{rgb:'888888'}}
+};
+
+// 填充色
+const BG={
+  LABEL :'D9D9D9', // 标签背景（灰）
+  STEP  :'BDD7EE', // 步骤/表头蓝
+  RESULT:'E2EFDA', // 结果绿
+  LEGEND_PASS:'C6EFCE', // 说明✓绿
+  LEGEND_NA  :'FFEB9C', // 说明N/A黄
+  LEGEND_FAIL:'FFC7CE', // 说明×红
+  SECTION:'E9EFF7', // 节标题浅蓝灰
+};
+
+function makeStyle(opts={}){
+  return {
+    font:{name:'宋体',sz:opts.sz||10,bold:opts.bold||false,
+          color:opts.fontColor?{rgb:opts.fontColor}:undefined},
+    alignment:{wrapText:true,vertical:'center',
+               horizontal:opts.align||'center'},
+    border:BORDER,
+    fill:opts.bg?{fgColor:{rgb:opts.bg},patternType:'solid'}:undefined
+  }
+}
+
+function buildSheet(d){
+  const ws={};
+  const merges=[];
+  const enc=(r,c)=>XLSX.utils.encode_cell({r,c});
+
+  // 总列数：A(0) B(1) C..C+steps-1 (步骤列) 最后=备注列
+  // 布局参考截图：
+  //   A列=标签  B列=值/子标签  C..=内容/步骤  最后列=备注
+  // 为了还原截图，固定布局：
+  //   col0=A标签, col1=B值, col2..col1+steps=步骤列, col2+steps=备注
+  const SC=steps.length; // 步骤数
+  const COL_REMARK=2+SC; // 备注列索引
+  const TOTAL_COLS=COL_REMARK+1;
+
+  function sc(r,c,v,opts={}){
+    if(c>TOTAL_COLS-1)return;
+    const cell={v:v==null?'':v, t:typeof v==='number'?'n':'s'};
+    cell.s=makeStyle(opts);
+    ws[enc(r,c)]=cell;
+  }
+  function mg(r1,c1,r2,c2){
+    // 补空白单元格
+    for(let r=r1;r<=r2;r++)for(let c=c1;c<=c2;c++){
+      if(!ws[enc(r,c)])ws[enc(r,c)]={v:'',t:'s',s:makeStyle()};
+    }
+    merges.push({s:{r:r1,c:c1},e:{r:r2,c:c2}});
+  }
+  // 整行跨全部列
+  function fullRow(r,v,opts={}){
+    sc(r,0,v,opts);
+    mg(r,0,r,TOTAL_COLS-1);
+  }
+  // A列标签 + B~末列内容
+  function labelRow(r,label,val,labelOpts={},valOpts={}){
+    sc(r,0,label,{...{bold:true,bg:BG.LABEL},...labelOpts});
+    sc(r,1,val,{...{align:'left'},...valOpts});
+    mg(r,1,r,TOTAL_COLS-1);
+  }
+  // A列标签(跨rows) + B列子标签 + C~末列内容
+  function subLabelRow(r,bLabel,val,bOpts={},valOpts={}){
+    sc(r,1,bLabel,{...{bg:BG.LABEL},...bOpts});
+    sc(r,2,val,{...{align:'left'},...valOpts});
+    mg(r,2,r,TOTAL_COLS-1);
+  }
+
+  let R=0;
+
+  // ── 行0: 文档名称 ────────────────────────────────────────
+  sc(R,0,'文档名称',{bold:true,bg:BG.LABEL});
+  sc(R,1,d.documentName,{bold:true,align:'center'});
+  mg(R,1,R,TOTAL_COLS-1);
+  R++;
+
+  // ── 行1: 单位名称 ────────────────────────────────────────
+  sc(R,0,'测试单位名称',{bold:true,bg:BG.LABEL});
+  sc(R,1,d.unitName,{align:'center'});
+  mg(R,1,R,TOTAL_COLS-1);
+  R++;
+
+  // ── 行2-4: 流程名称（A列跨3行） ─────────────────────────
+  sc(R,  0,'流程名称',{bold:true,bg:BG.LABEL});
+  sc(R,  1,'一级流程',{bg:BG.LABEL});
+  sc(R,  2,d.process1,{align:'left'});
+  mg(R,2,R,TOTAL_COLS-1);
+  sc(R+1,0,'',        {bg:BG.LABEL});
+  sc(R+1,1,'二级流程',{bg:BG.LABEL});
+  sc(R+1,2,d.process2,{align:'left'});
+  mg(R+1,2,R+1,TOTAL_COLS-1);
+  sc(R+2,0,'',        {bg:BG.LABEL});
+  sc(R+2,1,'三级流程',{bg:BG.LABEL});
+  sc(R+2,2,d.process3,{align:'left'});
+  mg(R+2,2,R+2,TOTAL_COLS-1);
+  mg(R,0,R+2,0); // A列"流程名称"跨3行
+  R+=3;
+
+  // ── 空行 ─────────────────────────────────────────────────
+  fullRow(R,'');
+  R++;
+
+  // ── 测试底稿信息（4行）───────────────────────────────────
+  sc(R,0,'1.测试底稿编号',{bold:true,bg:BG.LABEL});
+  sc(R,1,d.paperId,{align:'left'});
+  mg(R,1,R,TOTAL_COLS-1);
+  R++;
+
+  sc(R,0,'2.测试执行人',{bold:true,bg:BG.LABEL});
+  sc(R,1,d.tester,{align:'left'});
+  mg(R,1,R,TOTAL_COLS-1);
+  R++;
+
+  sc(R,0,'测试审阅人',{bold:true,bg:BG.LABEL});
+  sc(R,1,d.reviewer||'',{align:'left'});
+  mg(R,1,R,TOTAL_COLS-1);
+  R++;
+
+  sc(R,0,'完成日期',{bold:true,bg:BG.LABEL});
+  sc(R,1,d.completionDate,{align:'left'});
+  mg(R,1,R,TOTAL_COLS-1);
+  R++;
+
+  // ── 3. 抽样标准（标题行 + 4数据行）─────────────────────
+  sc(R,0,'3.抽样标准',{bold:true,bg:BG.LABEL});
+  mg(R,0,R,TOTAL_COLS-1);
+  R++;
+
+  sc(R,0,'抽样方法',{bg:BG.LABEL});
+  sc(R,1,d.sampling.method,{align:'left'});
+  mg(R,1,R,TOTAL_COLS-1);
+  R++;
+
+  sc(R,0,'抽样期间',{bg:BG.LABEL});
+  sc(R,1,d.sampling.period,{align:'left'});
+  mg(R,1,R,TOTAL_COLS-1);
+  R++;
+
+  sc(R,0,'样本数量描述',{bg:BG.LABEL});
+  sc(R,1,String(d.sampling.sampleCount),{align:'left'});
+  mg(R,1,R,TOTAL_COLS-1);
+  R++;
+
+  sc(R,0,'样本来源',{bg:BG.LABEL});
+  sc(R,1,d.sampling.sampleSource,{align:'left'});
+  mg(R,1,R,TOTAL_COLS-1);
+  R++;
+
+  // ── 4. 控制点描述 ────────────────────────────────────────
+  sc(R,0,'4.控制点描述',{bold:true,bg:BG.LABEL});
+  sc(R,1,d.controlDesc,{align:'left'});
+  const descEndR=R+9; // 预留10行高度
+  mg(R,1,descEndR,TOTAL_COLS-1);
+  mg(R,0,descEndR,0);
+  R=descEndR+1;
+
+  // ── 空行 ─────────────────────────────────────────────────
+  fullRow(R,'');
+  R++;
+
+  // ── 5. 测试结果 ──────────────────────────────────────────
+  sc(R,0,'5.测试结果',{bold:true,bg:BG.SECTION});
+  mg(R,0,R,TOTAL_COLS-1);
+  R++;
+
+  // 表头
+  sc(R,0,'控制编号',{bold:true,bg:BG.STEP,align:'center'});
+  sc(R,1,'测试结果',{bold:true,bg:BG.STEP,align:'center'});
+  mg(R,1,R,TOTAL_COLS-1);
+  R++;
+
+  // 数据
+  sc(R,0,d.testResult.controlIds,{align:'center'});
+  sc(R,1,d.testResult.result,{bold:true,bg:BG.RESULT,align:'center'});
+  mg(R,1,R,TOTAL_COLS-1);
+  R++;
+
+  // ── 空行 ─────────────────────────────────────────────────
+  fullRow(R,'');
+  R++;
+
+  // ── 6. 测试步骤描述 ──────────────────────────────────────
+  sc(R,0,'6.测试步骤描述',{bold:true,bg:BG.SECTION});
+  mg(R,0,R,TOTAL_COLS-1);
+  R++;
+
+  d.steps.forEach((s,i)=>{
+    sc(R,0,`步骤${i+1}`,{bold:true,bg:BG.STEP,align:'center'});
+    sc(R,1,s,{align:'left'});
+    mg(R,1,R,TOTAL_COLS-1);
+    R++;
+  });
+
+  // ── 空行 ─────────────────────────────────────────────────
+  fullRow(R,'');
+  R++;
+
+  // ── 7. 详细测试记录 ──────────────────────────────────────
+  sc(R,0,'7.详细测试记录',{bold:true,bg:BG.SECTION});
+  mg(R,0,R,TOTAL_COLS-1);
+  R++;
+
+  // 表头第1行
+  const H1R=R;
+  sc(R,0,'样本序号',{bold:true,bg:BG.STEP,align:'center'});
+  sc(R,1,'样本描述',{bold:true,bg:BG.STEP,align:'center'});
+  sc(R,2,'测试结果',{bold:true,bg:BG.STEP,align:'center'});
+  if(SC>1) mg(R,2,R,1+SC); // 测试结果跨步骤列
+  sc(R,COL_REMARK,'备注',{bold:true,bg:BG.STEP,align:'center'});
+  R++;
+
+  // 表头第2行（步骤细分）
+  const H2R=R;
+  // 样本序号和样本描述跨两行
+  mg(H1R,0,H2R,0);
+  mg(H1R,1,H2R,1);
+  mg(H1R,COL_REMARK,H2R,COL_REMARK);
+  // 步骤列标题
+  d.steps.forEach((s,i)=>{
+    sc(R,2+i,`步骤${i+1}\n${s}`,{bold:true,bg:BG.STEP,align:'center',sz:9});
+  });
+  R++;
+
+  // 样本数据行
+  d.samples.forEach(s=>{
+    sc(R,0,s.no,{t:'n',align:'center'});
+    sc(R,1,s.content,{align:'left'});
+    (s.stepResults||[]).forEach((res,ti)=>{
+      // 根据结果设置不同底色
+      let bg=undefined;
+      if(res==='✓')bg=BG.LEGEND_PASS;
+      else if(res==='×')bg=BG.LEGEND_FAIL;
+      else if(res==='N/A')bg=BG.LEGEND_NA;
+      sc(R,2+ti,res,{align:'center',bg:bg,
+        fontColor:res==='✓'?'006100':res==='×'?'9C0006':'7D6608'});
+    });
+    sc(R,COL_REMARK,s.remark||'',{align:'left'});
+    R++;
+  });
+
+  // 图例说明行（测试结果填制说明）
+  // 空隔行
+  fullRow(R,'');
+  R++;
+
+  // 图例标题单元格
+  sc(R,0,'测试结果填制说明',{bold:true,bg:BG.LABEL,align:'center'});
+  mg(R,0,R+2,0); // A列跨3行
+  // 图例行1: ✓
+  sc(R,1,'✓',{bold:true,bg:BG.LEGEND_PASS,align:'center',fontColor:'006100'});
+  sc(R,2,'代表无例外或无异常情况',{align:'left'});
+  mg(R,2,R,TOTAL_COLS-1);
+  R++;
+  // 图例行2: N/A
+  sc(R,1,'N/A',{bold:true,bg:BG.LEGEND_NA,align:'center',fontColor:'7D6608'});
+  sc(R,2,'不适用',{align:'left'});
+  mg(R,2,R,TOTAL_COLS-1);
+  R++;
+  // 图例行3: ×
+  sc(R,1,'×',{bold:true,bg:BG.LEGEND_FAIL,align:'center',fontColor:'9C0006'});
+  sc(R,2,'代表例外或异常情况，在下面详细说明',{align:'left'});
+  mg(R,2,R,TOTAL_COLS-1);
+  R++;
+
+  // ── 空行 ─────────────────────────────────────────────────
+  fullRow(R,'');
+  R++;
+
+  // ── 8. 测试差异情况说明 ───────────────────────────────────
+  sc(R,0,'8.测试差异情况说明',{bold:true,bg:BG.SECTION});
+  mg(R,0,R,TOTAL_COLS-1);
+  R++;
+
+  // 差异表表头 - 5列横跨
+  // 按截图：A=缺陷序号 B=情况说明(宽) C/D=步骤号 E=样本序号 末=支持性文档
+  const anomHdrs=['内部控制评价发现缺陷汇总表序号','情况说明','步骤号','样本序号','支持性文档名称'];
+  // 均匀分布在全部列
+  const aColMap=[0,1,2,3,4]; // 前5列
+  anomHdrs.forEach((h,i)=>{
+    sc(R,aColMap[i],h,{bold:true,bg:BG.STEP,align:'center'});
+  });
+  // 情况说明列如果步骤数>1则合并
+  if(SC>1){
+    // 不做额外合并，保持单列
+  }
+  R++;
+
+  if(d.anomalies.length>0){
+    d.anomalies.forEach(a=>{
+      sc(R,0,a.findingNo,{align:'center'});
+      sc(R,1,a.description,{align:'left'});
+      sc(R,2,a.stepNo,{align:'center'});
+      sc(R,3,a.sampleNo,{align:'center'});
+      sc(R,4,a.supportingDoc,{align:'left'});
+      // 补全剩余列
+      for(let c=5;c<TOTAL_COLS;c++) sc(R,c,'',{});
+      R++;
+    });
+  } else {
+    // 空白行
+    for(let c=0;c<TOTAL_COLS;c++) sc(R,c,'',{});
+    R++;
+    for(let c=0;c<TOTAL_COLS;c++) sc(R,c,'',{});
+    R++;
+  }
+
+  // ── 列宽 ─────────────────────────────────────────────────
+  // A=12, B=30, 步骤列每列20, 备注=15
+  ws['!cols']=[
+    {wch:14}, // A: 标签
+    {wch:32}, // B: 主内容/值
+    ...d.steps.map(()=>({wch:22})), // 步骤列
+    {wch:16}  // 备注
+  ];
+
+  // ── 行高 ─────────────────────────────────────────────────
+  const rowH=[];
+  for(let i=0;i<R;i++) rowH.push({hpx:18});
+  // 控制点描述区域行高
+  for(let i=0;i<10;i++) rowH[descEndR-9+i]={hpx:18};
+  // 找控制点描述起始行
+  // 步骤表头行稍高
+  ws['!rows']=rowH;
+
+  // ── 合并 & range ─────────────────────────────────────────
+  ws['!merges']=merges;
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:R,c:TOTAL_COLS-1}});
+
+  return ws;
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+(function init(){
+  renderSteps();
+  samples[0].stepResults=new Array(steps.length).fill('✓');
+  samples[0].stepResults[2]='N/A';
+  renderSampleTable();
+  renderAnomalies();
+  document.getElementById('previewModal').addEventListener('click',function(e){
+    if(e.target===this)closePreview();
+  });
+})();
+</script>
+</body>
+</html>
