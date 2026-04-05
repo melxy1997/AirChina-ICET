@@ -1,0 +1,417 @@
+// ===
+//  ICET Prisma Schema
+//  数据库: PostgreSQL
+// ===
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ──────────────────────────────────────
+//  §1  组织与用户
+// ──────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  parentId  String?
+  parent    Organization?  @relation("OrgHierarchy", fields: [parentId], references: [id])
+  children  Organization[] @relation("OrgHierarchy")
+  users     User[]
+  scenarios BusinessScenario[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  email          String   @unique
+  role           String   @default("TESTER") // ADMIN | TESTER | REVIEWER | VIEWER
+  passwordHash   String   @map("password_hash")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("users")
+}
+
+// ──────────────────────────────────────
+//  §2  业务场景
+// ──────────────────────────────────────
+
+model BusinessScenario {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  processLevel1  String   @map("process_l1")
+  processLevel2  String   @map("process_l2")
+  processLevel3  String?  @map("process_l3")
+  name           String
+  description    String?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdBy      String   @map("created_by")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  regulations    Regulation[]
+  tasks          TestTask[]
+
+  // M:N 关系
+  scenarioRegulations ScenarioRegulation[]
+
+  @@map("business_scenarios")
+}
+
+// ──────────────────────────────────────
+//  §3  规章制度
+// ──────────────────────────────────────
+
+model Regulation {
+  id            String    @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  title         String
+  version       String
+  effectiveDate String?   @map("effective_date")
+  expiryDate    String?   @map("expiry_date")
+  fileRefId     String    @map("file_ref_id")
+  fileRef       FileReference @relation(fields: [fileRefId], references: [id])
+  parseStatus   String    @default("QUEUED") @map("parse_status") // QUEUED | RUNNING | COMPLETED | FAILED
+  parsedAt      DateTime? @map("parsed_at")
+  rawParseResult String?  @map("raw_parse_result") @db.Text
+  createdBy     String    @map("created_by")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  controlPoints ControlPoint[]
+  scenarios     BusinessScenario[]
+
+  // M:N 关系
+  scenarioRegulations ScenarioRegulation[]
+  taskRegulations     TestTaskRegulation[]
+
+  @@map("regulations")
+}
+
+model ControlPoint {
+  id            String   @id @default(uuid())
+  regulationId  String
+  regulation    Regulation @relation(fields: [regulationId], references: [id], onDelete: Cascade)
+  controlId     String   @map("control_id") // "C1", "C2"
+  title         String
+  description   String   @db.Text
+  responsible   String?
+  timing        String?
+  approvalChain String[] @map("approval_chain")
+  suggestedSteps String[] @map("suggested_steps")
+  suggestedEvidenceTypes String[] @map("suggested_evidence_types")
+  confidence    Float    @default(0)
+  pageRefs      Int[]    @map("page_refs")
+  createdAt     DateTime @default(now())
+
+  @@map("control_points")
+}
+
+// M:N: 场景-规章制度
+model ScenarioRegulation {
+  scenarioId   String
+  scenario     BusinessScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  regulationId String
+  regulation   Regulation @relation(fields: [regulationId], references: [id], onDelete: Cascade)
+
+  @@id([scenarioId, regulationId])
+  @@map("scenario_regulations")
+}
+
+// ──────────────────────────────────────
+//  §4  文件系统
+// ──────────────────────────────────────
+
+model FileReference {
+  id           String   @id @default(uuid())
+  originalName String   @map("original_name")
+  storagePath  String   @map("storage_path")
+  fileType     String   @default("OTHER") @map("file_type") // PDF | IMAGE | EXCEL | WORD | OTHER
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  checksum     String
+  pageCount    Int?     @map("page_count")
+  uploadedBy   String   @map("uploaded_by")
+  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+
+  regulation   Regulation?
+  exportedFiles ExportedFile[]
+  samples      SampleFileRef[]
+
+  @@map("file_references")
+}
+
+// ──────────────────────────────────────
+//  §5  测试任务
+// ──────────────────────────────────────
+
+model TestTask {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("org_id")
+  scenarioId      String   @map("scenario_id")
+  scenario        BusinessScenario @relation(fields: [scenarioId], references: [id])
+  paperId         String   @map("paper_id")
+  unitName        String   @map("unit_name")
+  testerId        String   @map("tester_id")
+  reviewerId      String?  @map("reviewer_id")
+  completionDate  String?  @map("completion_date")
+  status          String   @default("DRAFT") // DRAFT | PLANNING | PLAN_REVIEW | ...
+  samplingMethod  String   @default("随机抽样") @map("sampling_method")
+  samplingPeriod  String   @default("") @map("sampling_period")
+  samplingSource  String   @default("") @map("sampling_source")
+  testPlanId      String?  @map("test_plan_id")
+  sampleSetId     String?  @map("sample_set_id")
+  workingPaperId  String?  @map("working_paper_id")
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  plan            TestPlan?
+  sampleSet       SampleSet?
+  workingPaper    WorkingPaper?
+  statusHistory   TaskStatusHistory[]
+  anomalies       AnomalyRecord[]
+
+  // M:N 关系
+  taskRegulations TestTaskRegulation[]
+
+  @@map("test_tasks")
+}
+
+model TaskStatusHistory {
+  id        String   @id @default(uuid())
+  taskId    String   @map("task_id")
+  task      TestTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  status    String
+  changedBy String   @map("changed_by")
+  changedAt DateTime @default(now()) @map("changed_at")
+  comment   String?
+
+  @@map("test_task_status_history")
+}
+
+// M:N: 任务-规章制度
+model TestTaskRegulation {
+  taskId       String
+  task         TestTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  regulationId String
+  regulation   Regulation @relation(fields: [regulationId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, regulationId])
+  @@map("test_task_regulations")
+}
+
+// ──────────────────────────────────────
+//  §6  测试计划
+// ──────────────────────────────────────
+
+model TestPlan {
+  id                  String    @id @default(uuid())
+  taskId              String    @unique @map("task_id")
+  task                TestTask  @relation(fields: [taskId], references: [id])
+  controlDescription  String    @map("control_description") @db.Text
+  controlIds          String[]  @map("control_ids")
+  generatedBy         String    @default("HUMAN") @map("generated_by") // AI | HUMAN
+  aiJobId             String?   @map("ai_job_id")
+  generatedAt         DateTime  @default(now()) @map("generated_at")
+  reviewStatus        String    @default("PENDING") @map("review_status") // PENDING | APPROVED | REJECTED | MODIFIED
+  reviewedBy          String?   @map("reviewed_by")
+  reviewedAt          DateTime? @map("reviewed_at")
+  reviewComment       String?   @map("review_comment") @db.Text
+  version             Int       @default(1)
+  previousVersionId   String?   @map("prev_version_id")
+
+  steps               TestStep[]
+
+  @@map("test_plans")
+}
+
+model TestStep {
+  id              String @id @default(uuid())
+  planId          String @map("plan_id")
+  plan            TestPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  index           Int
+  description     String @db.Text
+  executionConfig Json   @map("execution_config") // StepExecutionConfig as JSON
+
+  stepExecutions  StepExecution[]
+
+  @@map("test_steps")
+}
+
+// ──────────────────────────────────────
+//  §7  样本集
+// ──────────────────────────────────────
+
+model SampleSet {
+  id        String   @id @default(uuid())
+  taskId    String   @unique @map("task_id")
+  task      TestTask @relation(fields: [taskId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  samples   Sample[]
+
+  @@map("sample_sets")
+}
+
+model Sample {
+  id           String   @id @default(uuid())
+  sampleSetId  String   @map("set_id")
+  sampleSet    SampleSet @relation(fields: [sampleSetId], references: [id], onDelete: Cascade)
+  no           Int
+  content      String   @db.Text
+  parsedContent Json?    @map("parsed_content") // SampleParsedContent as JSON
+  remark       String?  @db.Text
+  addedBy      String   @map("added_by")
+  addedAt      DateTime @default(now()) @map("added_at")
+
+  stepExecutions StepExecution[]
+  files         SampleFileRef[]
+
+  @@map("samples")
+}
+
+// M:N: 样本-文件
+model SampleFileRef {
+  sampleId  String
+  sample    Sample @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+  fileRefId String
+  fileRef   FileReference @relation(fields: [fileRefId], references: [id], onDelete: Cascade)
+
+  @@id([sampleId, fileRefId])
+  @@map("sample_file_refs")
+}
+
+// ──────────────────────────────────────
+//  §8  步骤执行记录
+// ──────────────────────────────────────
+
+model StepExecution {
+  id              String    @id @default(uuid())
+  sampleId        String    @map("sample_id")
+  sample          Sample    @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+  stepId          String    @map("step_id")
+  step            TestStep  @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  result          String    @default("PENDING") // ✓ | × | N/A | PENDING
+  executedBy      String    @default("HUMAN") // AI | HUMAN
+  aiJobId         String?   @map("ai_job_id")
+  aiReasoning     String?   @map("ai_reasoning") @db.Text
+  aiEvidence      Json?     @map("ai_evidence") // EvidenceItem[]
+  aiConfidence    Float?    @map("ai_confidence")
+  humanOverride   Boolean   @default(false) @map("human_override")
+  humanOverrideBy String?   @map("human_override_by")
+  humanOverrideAt DateTime? @map("human_override_at")
+  humanNote       String?   @map("human_note") @db.Text
+  executedAt      DateTime  @default(now()) @map("executed_at")
+
+  anomaly         AnomalyRecord?
+
+  @@unique([sampleId, stepId])
+  @@map("step_executions")
+}
+
+// ──────────────────────────────────────
+//  §9  异常记录
+// ──────────────────────────────────────
+
+model AnomalyRecord {
+  id               String   @id @default(uuid())
+  taskId           String   @map("task_id")
+  task             TestTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  stepExecutionId  String   @unique @map("step_exec_id")
+  stepExecution    StepExecution @relation(fields: [stepExecutionId], references: [id])
+  findingNo        String   @map("finding_no")
+  description      String   @db.Text
+  stepNo           String   @map("step_no")
+  sampleNo         String   @map("sample_no")
+  supportingDoc    String   @map("supporting_doc") @db.Text
+  severity         String?  // MAJOR | MINOR | OBSERVATION
+  status           String   @default("OPEN") // OPEN | ACKNOWLEDGED | RESOLVED | ACCEPTED_RISK
+  resolvedBy       String?  @map("resolved_by")
+  resolvedAt       DateTime? @map("resolved_at")
+  resolution       String?  @db.Text
+  createdBy        String   @map("created_by")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("anomaly_records")
+}
+
+// ──────────────────────────────────────
+//  §10 工作底稿
+// ──────────────────────────────────────
+
+model WorkingPaper {
+  id           String   @id @default(uuid())
+  taskId       String   @unique @map("task_id")
+  task         TestTask @relation(fields: [taskId], references: [id])
+  snapshotData Json     @map("snapshot_data") // 完整 WorkingPaper 快照
+  status       String   @default("DRAFT") // DRAFT | SUBMITTED | APPROVED | ARCHIVED
+  submittedBy  String?  @map("submitted_by")
+  submittedAt  DateTime? @map("submitted_at")
+  approvedBy   String?  @map("approved_by")
+  approvedAt   DateTime? @map("approved_at")
+  approvalComment String? @map("approval_comment") @db.Text
+  createdAt    DateTime @default(now())
+
+  exportedFiles ExportedFile[]
+
+  @@map("working_papers")
+}
+
+model ExportedFile {
+  id         String   @id @default(uuid())
+  paperId    String   @map("paper_id")
+  paper      WorkingPaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  fileRefId  String   @map("file_ref_id")
+  fileRef    FileReference @relation(fields: [fileRefId], references: [id])
+  exportedBy String   @map("exported_by")
+  exportedAt DateTime @default(now()) @map("exported_at")
+
+  @@map("exported_files")
+}
+
+// ──────────────────────────────────────
+//  §11 AI任务
+// ──────────────────────────────────────
+
+model AIJob {
+  id                String    @id @default(uuid())
+  type              String    // PARSE_REGULATION | GENERATE_TEST_PLAN | ...
+  inputEntityType   String    @map("input_entity_type")
+  inputEntityId     String    @map("input_entity_id")
+  status            String    @default("QUEUED") // QUEUED | RUNNING | COMPLETED | FAILED | CANCELLED
+  agentType         String    @map("agent_type") // REGULATION_PARSER | PLAN_GENERATOR | ...
+  modelUsed         String?   @map("model_used")
+  tokensUsed        Int?      @map("tokens_used")
+  durationMs        Int?      @map("duration_ms")
+  progress          Int?      // 0-100
+  currentStep       String?   @map("current_step")
+  outputEntityType  String?   @map("output_entity_type")
+  outputEntityId    String?   @map("output_entity_id")
+  errorMessage      String?   @map("error_message") @db.Text
+  errorStack        String?   @map("error_stack") @db.Text
+  checkpointState   String?   @map("checkpoint_state") @db.Text
+  startedAt         DateTime? @map("started_at")
+  completedAt       DateTime? @map("completed_at")
+  createdAt         DateTime  @default(now())
+
+  @@map("ai_jobs")
+}
