@@ -11,7 +11,7 @@ export function initWebSocket(httpServer: HttpServer): void {
     },
   });
 
-  io.on('connection', (socket: import('socket.io').Socket) => {
+  io!.on('connection', (socket: import('socket.io').Socket) => {
     console.log(`[WS] Client connected: ${socket.id}`);
 
     socket.on('disconnect', () => {
