@@ -1,0 +1,44 @@
+services:
+  # ── PostgreSQL ──
+  postgres:
+    image: postgres:16-alpine
+    container_name: icet-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: icet
+      POSTGRES_PASSWORD: icet123
+      POSTGRES_DB: icet
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # ── Redis ──
+  redis:
+    image: redis:7-alpine
+    container_name: icet-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+  # ── MinIO (S3-compatible) ──
+  minio:
+    image: minio/minio:latest
+    container_name: icet-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - miniodata:/data
+    command: server /data --console-address ":9001"
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
