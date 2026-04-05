@@ -4,14 +4,15 @@ let io: import('socket.io').Server | null = null;
 
 export function initWebSocket(httpServer: HttpServer): void {
   const { Server } = require('socket.io');
-  io = new Server(httpServer, {
+  const socketServer = new Server(httpServer, {
     cors: {
       origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
       methods: ['GET', 'POST'],
     },
   });
+  io = socketServer;
 
-  io!.on('connection', (socket: import('socket.io').Socket) => {
+  socketServer.on('connection', (socket: import('socket.io').Socket) => {
     console.log(`[WS] Client connected: ${socket.id}`);
 
     socket.on('disconnect', () => {

@@ -339,10 +339,10 @@ AI层（apps/api/src/agents）：
 
 | 问题 | 原因 | 解决方案 |
 |------|------|----------|
-| `pnpm install` 反复报 `ERR_PNPM_ENOENT: copyfile` | VM 环境文件系统不支持 pnpm 默认的 reflink/copyfile 机制（涉及 fast-check、engine.io-parser、@types/babel__traverse 等包） | 在 `.npmrc` 中设置 `node-linker=hoisted` + `package-import-method=copy`，改用 hoisted 模式和 copy 方式安装 |
-| `tsc` 报 `Referenced project must have setting "composite": true` | excel-generator 的 tsconfig 引用了 shared 包，但 shared 未开启 composite | 在 `packages/shared/tsconfig.json` 中添加 `"composite": true` |
-| `tsc` 报 `'io' is possibly 'null'` | websocket/server.ts 中 `io` 变量声明为 `Server | null`，赋值后直接使用 | 在赋值后使用非空断言 `io!.on(...)` |
-| zod v3.24 引入 fast-check 作为 peer dependency 导致安装失败 | fast-check 包在当前 VM 文件系统有兼容性问题 | 将 zod 版本从 `^3.24.0` 降级到 `^3.23.0` |
+| `pnpm install` 报 `ERR_PNPM_ENOENT: copyfile` | 在部分 VM、网络盘或受限文件系统上，pnpm 默认的 symlink / hardlink / reflink 与包内大量小文件的解压拷贝组合易失败；报错栈里的包名（如 `fast-check`、`engine.io-parser`）多为**连带失败**，不宜当作根因 | 在仓库根目录 `.npmrc` 中设置 `node-linker=hoisted` 与 `package-import-method=copy`（见文件内注释） |
+| `tsc` 报 `Referenced project must have setting "composite": true` | 使用 TypeScript **工程引用**（`references`）时，被引用工程必须 `composite: true`，才能产出可供下游引用的构建信息与声明 | 在 `packages/shared/tsconfig.json` 的 `compilerOptions` 中设置 `"composite": true`，并保持 `outDir` / `rootDir` 与引用链一致 |
+| `tsc` 报 `'io' is possibly 'null'` | 模块级 `io` 可为 `null`，对可空变量赋值后，控制流分析未必将后续使用收窄为非 null | 在 `initWebSocket` 内使用局部变量 `const socketServer = new Server(...)`，对 `socketServer.on(...)` 注册事件，再赋给 `io`，避免非空断言 `!` |
+| 误以为需「降级 zod」才能装上依赖 | zod 新版本可能声明对 `fast-check` 等 peer；若安装仍因**同一类**文件系统问题在解压这些包时失败，易被误判为版本问题 | **优先**确认 `.npmrc` 已生效并重装；`^3.23` 与 `^3.24` 都会解析到当前 3.x，**不必**为规避 peer 刻意锁死旧版；仍失败时再查权限、杀毒或同步软件对 `node_modules` 的占用 |
 
 #### 当前项目结构
 

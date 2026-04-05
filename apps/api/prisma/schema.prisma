@@ -23,9 +23,10 @@ model Organization {
   parentId  String?
   parent    Organization?  @relation("OrgHierarchy", fields: [parentId], references: [id])
   children  Organization[] @relation("OrgHierarchy")
-  users     User[]
-  scenarios BusinessScenario[]
-  createdAt DateTime @default(now())
+  users       User[]
+  scenarios   BusinessScenario[]
+  regulations Regulation[]
+  createdAt   DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("organizations")
@@ -85,7 +86,7 @@ model Regulation {
   version       String
   effectiveDate String?   @map("effective_date")
   expiryDate    String?   @map("expiry_date")
-  fileRefId     String    @map("file_ref_id")
+  fileRefId     String    @unique @map("file_ref_id")
   fileRef       FileReference @relation(fields: [fileRefId], references: [id])
   parseStatus   String    @default("QUEUED") @map("parse_status") // QUEUED | RUNNING | COMPLETED | FAILED
   parsedAt      DateTime? @map("parsed_at")
