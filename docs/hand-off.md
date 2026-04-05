@@ -279,12 +279,127 @@ AI层（apps/api/src/agents）：
    - 详细开发计划（逐任务拆解到函数级别）
    - README.md
 
+### ✅ Phase 0：Monorepo 脚手架（已完成）
+
+> 完成时间：2026-04-06
+> 分支：`feature/solo`
+> 提交数：7 个逻辑提交
+
+#### 完成内容
+
+| 模块 | 提交信息 | 说明 |
+|------|----------|------|
+| Monorepo 根配置 | `chore: init monorepo with pnpm + turbo` | pnpm workspaces + Turborepo + tsconfig.base.json + .gitignore + .env.example |
+| packages/shared | `feat(shared): add types, constants and utilities` | 全部 TypeScript 类型定义（base/entities/api/ai 四个文件）、常量（状态机转换规则）、工具函数（日期/验证） |
+| packages/excel-generator | `feat(excel-generator): add Excel generation package` | SheetJS 底稿构建：工作底稿主表 + 差异记录表 + 图例说明表 |
+| apps/api | `feat(api): init Express server with Prisma schema` | Express 应用框架 + 完整 Prisma Schema（15 个模型） + 6 组路由（tasks/samples/regulations/papers/files/ai） + 3 个中间件（error/auth/upload） + WebSocket 服务 + Prisma 客户端单例 |
+| apps/web | `feat(web): init React app with routing and layout` | React 18 + Vite + React Router v7 + Tailwind CSS + 侧边栏布局 + 6 个路由占位 |
+| Docker Compose | `chore: add Docker Compose for local infrastructure` | PostgreSQL 16 + Redis 7 + MinIO（含 Console 端口 9001） |
+| 构建修复 | `fix: resolve build issues` | tsconfig composite、zod 版本降级、WebSocket null check |
+
+#### 实现细节
+
+**packages/shared**（共享类型包）：
+- `src/types/base.ts` — 基础类型：ID、Timestamp、TaskStatus、StepResultValue、AIJobStatus 等 10 个类型
+- `src/types/entities.ts` — 全部 11 个章节的实体接口：Organization → User → BusinessScenario → Regulation → ControlPoint → FileReference → TestTask → TestPlan → TestStep → SampleSet → Sample → StepExecution → AnomalyRecord → WorkingPaper → AIJob
+- `src/types/api.ts` — API 请求/响应类型：PaginatedRequest/Response、CreateTaskRequest、AddSampleRequest 等
+- `src/types/ai.ts` — AI Agent 相关类型：ExecutorState、Observation
+- `src/constants/index.ts` — 常量：任务状态中文标签、状态转换规则矩阵、AI 并发数、系统用户 ID
+- `src/utils/date.ts` — 日期工具：now()、formatDate()、formatDateCN()
+- `src/utils/validators.ts` — 验证工具：isTransitionAllowed()、isValidStepResult()、isValidUUID()
+
+**packages/excel-generator**（Excel 生成包）：
+- `src/index.ts` — 纯函数 `buildWorkbook(data: WorkingPaper): ArrayBuffer`
+- 生成 3 个 Sheet：工作底稿主表（含合并单元格标题行）、差异记录表、图例说明表
+- 列宽自适应配置
+
+**apps/api**（后端 API）：
+- `prisma/schema.prisma` — 完整数据模型，15 个 Prisma Model，包含所有关系（1:N、M:N）、唯一约束、级联删除
+- `src/app.ts` — Express 应用工厂函数，配置 helmet/cors/morgan/json 解析
+- `src/middleware/error.middleware.ts` — AppError 类 + asyncHandler 包装器 + 统一错误处理
+- `src/middleware/auth.middleware.ts` — requireAuth / requireAdmin（开发模式跳过认证）
+- `src/middleware/upload.middleware.ts` — multer 内存/磁盘双模式，100MB 限制，文件类型白名单
+- `src/routes/` — 6 组路由文件，所有端点已挂载，返回 TODO 占位响应
+- `src/websocket/server.ts` — Socket.IO 服务，支持任务房间加入/离开，broadcast() 广播函数
+- `src/db/prisma.ts` — Prisma 客户端单例，开发模式打印 query 日志
+
+**apps/web**（前端 React）：
+- Vite 配置：路径别名 `@/`、API 代理 `/api` → `localhost:3000`、WS 代理
+- Tailwind CSS + PostCSS 配置
+- Layout 组件：深色侧边栏 + NavLink 高亮 + Outlet 主内容区
+- 6 个路由占位：Dashboard、业务场景、规章制度、测试任务、任务详情、底稿归档
+
+**Docker Compose**：
+- PostgreSQL 16 Alpine（端口 5432，用户 icet/icet123）
+- Redis 7 Alpine（端口 6379）
+- MinIO latest（API 端口 9000，Console 端口 9001，用户 minioadmin/minioadmin）
+- 命名卷持久化：pgdata、redisdata、miniodata
+
+#### 遇到的问题与解决方案
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| `pnpm install` 反复报 `ERR_PNPM_ENOENT: copyfile` | VM 环境文件系统不支持 pnpm 默认的 reflink/copyfile 机制（涉及 fast-check、engine.io-parser、@types/babel__traverse 等包） | 在 `.npmrc` 中设置 `node-linker=hoisted` + `package-import-method=copy`，改用 hoisted 模式和 copy 方式安装 |
+| `tsc` 报 `Referenced project must have setting "composite": true` | excel-generator 的 tsconfig 引用了 shared 包，但 shared 未开启 composite | 在 `packages/shared/tsconfig.json` 中添加 `"composite": true` |
+| `tsc` 报 `'io' is possibly 'null'` | websocket/server.ts 中 `io` 变量声明为 `Server | null`，赋值后直接使用 | 在赋值后使用非空断言 `io!.on(...)` |
+| zod v3.24 引入 fast-check 作为 peer dependency 导致安装失败 | fast-check 包在当前 VM 文件系统有兼容性问题 | 将 zod 版本从 `^3.24.0` 降级到 `^3.23.0` |
+
+#### 当前项目结构
+
+```
+icet/
+├── apps/
+│   ├── api/                          # 后端 Express API
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   ├── prisma/
+│   │   │   └── schema.prisma         # 15 个模型
+│   │   └── src/
+│   │       ├── main.ts               # 入口
+│   │       ├── app.ts                # 应用工厂
+│   │       ├── db/prisma.ts          # Prisma 客户端
+│   │       ├── middleware/            # error / auth / upload
+│   │       ├── routes/               # 6 组路由（TODO 占位）
+│   │       └── websocket/server.ts   # Socket.IO
+│   └── web/                          # 前端 React 应用
+│       ├── package.json
+│       ├── vite.config.ts
+│       ├── tailwind.config.js
+│       └── src/
+│           ├── main.tsx
+│           ├── App.tsx               # 路由配置
+│           └── components/layout/Layout.tsx  # 侧边栏布局
+├── packages/
+│   ├── shared/                       # 共享类型与工具
+│   │   └── src/
+│   │       ├── types/                # base / entities / api / ai
+│   │       ├── constants/            # 状态机规则、系统配置
+│   │       └── utils/                # date / validators
+│   └── excel-generator/              # Excel 底稿生成
+│       └── src/index.ts              # buildWorkbook()
+├── docker-compose.yml                # PG + Redis + MinIO
+├── turbo.json                        # Turborepo 配置
+├── pnpm-workspace.yaml
+├── tsconfig.base.json
+├── .npmrc                            # node-linker=hoisted
+├── .env.example
+└── readme.md
+```
+
+#### 构建验证结果
+
+| 包 | tsc | vite build | 状态 |
+|----|-----|------------|------|
+| @icet/shared | ✅ | — | 通过 |
+| @icet/excel-generator | ✅ | — | 通过 |
+| @icet/api | ✅ | — | 通过 |
+| @icet/web | ✅ | ✅ (182KB gzip:60KB) | 通过 |
+
 ### 尚未开始开发
-- **Phase 0**：Monorepo脚手架、Prisma Schema、Docker Compose
-- **Phase 1**：认证、CRUD API、文件系统、底稿导出（将HTML原型迁移为React组件+API）
-- **Phase 2**：消息队列、WebSocket、SampleParserAgent、RegulationParserAgent
-- **Phase 3**：PlanGeneratorAgent、TestExecutorAgent（LangGraph核心）、前端执行矩阵
-- **Phase 4**：异常管理、审阅归档、Dashboard
+- **Phase 1**：认证（JWT 完整实现）、CRUD API（Service 层 + Controller 真实逻辑）、文件系统（MinIO 集成）、底稿导出（API 端 + 前端组件）
+- **Phase 2**：消息队列（BullMQ + Worker）、WebSocket 进度推送集成、SampleParserAgent、RegulationParserAgent
+- **Phase 3**：PlanGeneratorAgent、TestExecutorAgent（LangGraph 核心图）、前端执行矩阵 UI
+- **Phase 4**：异常管理、审阅归档流程、Dashboard 统计
 
 ---
 
