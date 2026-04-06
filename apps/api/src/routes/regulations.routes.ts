@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { paramStr } from '../lib/req-params.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
-import { asyncHandler } from '../middleware/error.middleware.js';
+import { asyncHandler, AppError } from '../middleware/error.middleware.js';
 import { uploadMemory } from '../middleware/upload.middleware.js';
 import * as regulationService from '../services/regulation.service.js';
+import * as fileService from '../services/file.service.js';
 
 export const regulationRoutes = Router();
 regulationRoutes.use(requireAuth);
@@ -20,20 +21,27 @@ regulationRoutes.get(
   }),
 );
 
-/** POST /regulations */
+/** POST /regulations — 上传规章制度文件到 S3，创建记录 */
 regulationRoutes.post(
   '/',
   uploadMemory.single('file'),
   asyncHandler(async (req, res) => {
     if (!req.file) {
-      res.status(400).json({ error: { message: '请上传规章制度文件' } });
-      return;
+      throw new AppError(400, '请上传规章制度文件');
     }
     const userId = req.userId!;
     const orgId = req.orgId!;
     const body = req.body;
-    // TODO: 上传文件到 MinIO，获取 storagePath
-    const storagePath = `regulations/${Date.now()}-${req.file.originalname}`;
+
+    // 上传文件到 S3
+    const fileRef = await fileService.uploadFile({
+      buffer: req.file.buffer,
+      originalName: req.file.originalname,
+      mimeType: req.file.mimetype,
+      uploadedBy: userId,
+      prefix: 'regulations',
+    });
+
     const result = await regulationService.createRegulation({
       organizationId: orgId,
       title: body.title || req.file.originalname,
@@ -43,8 +51,8 @@ regulationRoutes.post(
       originalName: req.file.originalname,
       mimeType: req.file.mimetype,
       sizeBytes: req.file.size,
-      storagePath,
-      pageCount: undefined,
+      storagePath: fileRef.storagePath,
+      fileRefId: fileRef.id,
       uploadedBy: userId,
     });
     res.status(201).json(result);

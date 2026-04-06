@@ -3,13 +3,17 @@
  *
  * 使用方式：
  *   1. 确保 docker compose up -d && pnpm --filter @icet/api db:seed 已执行
- *   2. 确保 API 服务运行在 localhost:3000
+ *   2. 确保 API 服务已启动（默认 http://127.0.0.1:3000）
  *   3. 运行: node apps/api/tests/api.test.mjs
+ *
+ * 环境变量（可选）：
+ *   API_ORIGIN — 仅 host+port，默认 http://127.0.0.1:3000（避免 Node fetch 对 localhost→IPv6 出现 ECONNRESET）
  *
  * 脚本会自动：登录 → 测试所有 CRUD 端点 → 输出结果
  */
 
-const BASE = 'http://localhost:3000/api/v1';
+const ORIGIN = process.env.API_ORIGIN ?? 'http://127.0.0.1:3000';
+const BASE = `${ORIGIN}/api/v1`;
 
 // ── 工具函数 ──
 
@@ -49,9 +53,8 @@ async function section(name) {
 
 async function testHealth() {
   await section('健康检查');
-  const { status, body } = await request('/health');
-  // /health 不在 /api/v1 下
-  assert(true, `GET /health → ${status} (跳过，路径不同)`);
+  const res = await fetch(`${ORIGIN}/health`);
+  assert(res.status === 200, `GET /health → ${res.status}`);
 }
 
 async function testAuth() {
@@ -91,7 +94,7 @@ async function testAuth() {
   assert(badLogin.status === 401, `错误密码登录 → ${badLogin.status}`);
 
   // 未认证访问
-  const noAuth = await fetch(`${BASE}/scenarios`);
+  const noAuth = await fetch(`${BASE}/scenarios`, { headers: { Accept: 'application/json' } });
   assert(noAuth.status === 401, `未认证访问 /scenarios → ${noAuth.status}`);
 }
 
@@ -381,7 +384,6 @@ async function testAuthRoles() {
     body: JSON.stringify({ email: 'tester@icet.dev', password: 'tester123' }),
   });
   assert(testerLogin.status === 200, `测试人登录 → ${testerLogin.status}`);
-  const testerToken = testerLogin.body?.token;
 
   // 用 reviewer 账号登录
   const reviewerLogin = await request('/auth/login', {

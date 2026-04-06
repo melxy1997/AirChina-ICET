@@ -1,36 +1,62 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware.js';
-import { asyncHandler } from '../middleware/error.middleware.js';
+import { asyncHandler, AppError } from '../middleware/error.middleware.js';
 import { uploadMemory } from '../middleware/upload.middleware.js';
+import * as fileService from '../services/file.service.js';
 
 export const fileRoutes = Router();
-
 fileRoutes.use(requireAuth);
 
-/** POST /files/upload - 上传文件 */
+/** POST /files/upload - 上传文件到 S3 */
 fileRoutes.post(
   '/upload',
   uploadMemory.single('file'),
   asyncHandler(async (req, res) => {
     if (!req.file) {
-      res.status(400).json({ error: { message: '未提供文件' } });
-      return;
+      throw new AppError(400, '未提供文件');
     }
-    // TODO: Phase 1 实现文件存储
-    res.json({
-      id: 'temp-id',
+    const userId = (req as any).userId;
+    const prefix = (req.body.prefix as string) || undefined;
+    const fileRef = await fileService.uploadFile({
+      buffer: req.file.buffer,
       originalName: req.file.originalname,
-      size: req.file.size,
-      message: 'Not implemented yet',
+      mimeType: req.file.mimetype,
+      uploadedBy: userId,
+      prefix,
     });
+    res.status(201).json(fileRef);
   }),
 );
 
-/** GET /files/:id - 下载文件 */
+/** GET /files/:id - 获取文件下载 URL */
 fileRoutes.get(
   '/:id',
   asyncHandler(async (req, res) => {
-    // TODO: Phase 1 实现
-    res.json({ id: req.params.id, message: 'Not implemented yet' });
+    const url = await fileService.getDownloadUrl(req.params.id);
+    res.json({ url });
+  }),
+);
+
+/** GET /files/:id/download - 直接下载文件流 */
+fileRoutes.get(
+  '/:id/download',
+  asyncHandler(async (req, res) => {
+    const { stream, contentType, originalName } = await fileService.getFileStream(req.params.id);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(originalName)}"`);
+    if (stream) {
+      (stream as NodeJS.ReadableStream).pipe(res);
+    } else {
+      throw new AppError(500, '文件流获取失败');
+    }
+  }),
+);
+
+/** DELETE /files/:id - 删除文件 */
+fileRoutes.delete(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    await fileService.deleteFile(req.params.id);
+    res.json({ success: true });
   }),
 );

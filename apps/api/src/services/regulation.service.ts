@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import { prisma } from '../db/prisma.js';
 import { AppError } from '../middleware/error.middleware.js';
 
@@ -26,7 +25,7 @@ export async function getRegulation(id: string, orgId: string) {
     include: {
       fileRef: true,
       controlPoints: { orderBy: { controlId: 'asc' } },
-      scenarios: { select: { id: true, name: true } },
+      scenarios: { select: { scenario: { select: { id: true, name: true } } } },
     },
   });
   if (!regulation) throw new AppError(404, '规章制度不存在');
@@ -39,29 +38,9 @@ export async function createRegulation(data: {
   version: string;
   effectiveDate?: string;
   expiryDate?: string;
-  originalName: string;
-  mimeType: string;
-  sizeBytes: number;
-  storagePath: string;
-  pageCount?: number;
+  fileRefId: string;
   uploadedBy: string;
 }) {
-  const checksum = crypto.randomBytes(16).toString('hex'); // TODO: 真实 checksum
-  const fileType = mapFileType(data.mimeType);
-
-  const fileRef = await prisma.fileReference.create({
-    data: {
-      originalName: data.originalName,
-      storagePath: data.storagePath,
-      fileType,
-      mimeType: data.mimeType,
-      sizeBytes: data.sizeBytes,
-      checksum,
-      pageCount: data.pageCount,
-      uploadedBy: data.uploadedBy,
-    },
-  });
-
   return prisma.regulation.create({
     data: {
       organizationId: data.organizationId,
@@ -69,7 +48,7 @@ export async function createRegulation(data: {
       version: data.version,
       effectiveDate: data.effectiveDate,
       expiryDate: data.expiryDate,
-      fileRefId: fileRef.id,
+      fileRefId: data.fileRefId,
       parseStatus: 'QUEUED',
       createdBy: data.uploadedBy,
     },
@@ -82,12 +61,4 @@ export async function deleteRegulation(id: string, orgId: string) {
   if (!regulation) throw new AppError(404, '规章制度不存在');
   await prisma.regulation.delete({ where: { id } });
   return { success: true };
-}
-
-function mapFileType(mimeType: string): string {
-  if (mimeType.includes('pdf')) return 'PDF';
-  if (mimeType.includes('image')) return 'IMAGE';
-  if (mimeType.includes('sheet')) return 'EXCEL';
-  if (mimeType.includes('word') || mimeType.includes('document')) return 'WORD';
-  return 'OTHER';
 }
