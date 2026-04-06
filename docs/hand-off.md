@@ -407,10 +407,145 @@ icet/
 | @icet/api | ✅ | — | 通过 |
 | @icet/web | ✅ | ✅ (182KB gzip:60KB) | 通过 |
 
+### ✅ Phase 1：核心 CRUD（已完成）
+
+> 完成时间：2026-04-06
+> 分支：`feature/solo`
+> 新增提交：3 个
+
+#### 完成内容
+
+| Commit | 说明 |
+|--------|------|
+| `feat(api): add JWT authentication with register, login and seed data` | JWT 认证完整实现 + 数据库种子脚本 |
+| `feat(api): add CRUD services and routes for scenarios, tasks, samples, regulations, papers` | 6 个 Service + 7 组路由全部接入真实逻辑 |
+| `feat(web): add login, scenario, task, regulation pages with auth and API client` | 前端登录 + 4 个业务页面 + API 客户端 + 认证上下文 |
+
+#### 实现细节
+
+**后端 — JWT 认证模块**：
+- `src/services/auth.service.ts` — register()、login()、me()、verifyToken()，bcrypt 加密密码，jsonwebtoken 签发 JWT
+- `src/routes/auth.routes.ts` — POST /auth/register、POST /auth/login、GET /auth/me，Zod 校验请求体
+- `src/middleware/auth.middleware.ts` — requireAuth 从 Bearer token 提取并验证 JWT，requireAdmin 检查角色
+- `prisma/seed.ts` — 创建默认组织 + 3 个测试账号（admin/tester/reviewer）
+
+**后端 — 6 个 CRUD Service**：
+- `scenario.service.ts` — 业务场景列表/详情/创建/更新/软删除 + 规章制度关联/取消关联
+- `regulation.service.ts` — 规章制度列表/详情/创建（同步生成 FileReference）/删除，MIME 类型自动映射
+- `task.service.ts` — 测试任务列表（支持状态/执行人筛选）/详情（含全部子资源 eager load）/创建（事务内关联规章制度）/更新/状态转换（校验状态机规则）
+- `sample.service.ts` — 样本集自动创建（getOrCreate）/列表/添加（支持关联文件）/更新/删除
+- `execution.service.ts` — 步骤执行结果 upsert（校验结果值合法性）/批量更新
+- `paper.service.ts` — 工作底稿生成（从任务数据构建 WorkingPaper 快照）/Excel 导出（调用 @icet/excel-generator）/提交/审批
+
+**后端 — 7 组路由**：
+- `/auth/*` — 公开路由，不需要认证
+- `/scenarios/*` — 业务场景 CRUD + 规章制度关联管理
+- `/tasks/*` — 测试任务 CRUD + 状态流转 PATCH
+- `/tasks/:id/samples/*` — 样本管理 + 步骤结果更新 + 批量执行
+- `/tasks/:id/paper/*` — 底稿生成/查询/导出/提交/审批
+- `/regulations/*` — 规章制度上传（multer）+ 列表/详情/删除
+- `/files/*`、`/ai-jobs/*` — 保留占位，Phase 2 实现
+
+**前端 — 基础设施**：
+- `src/lib/api.ts` — 封装 fetch 的 API 客户端，自动附加 JWT token，支持 JSON/文件上传/文件下载
+- `src/lib/auth.tsx` — AuthProvider + useAuth hook，token 持久化到 localStorage，启动时自动校验 /auth/me
+
+**前端 — 5 个页面**：
+- `LoginPage` — 邮箱+密码登录表单，预填测试账号
+- `ScenarioListPage` — 业务场景列表 + 内联新建表单，点击行跳转详情
+- `TaskListPage` — 测试任务列表，状态筛选标签（使用 @icet/shared 的 TASK_STATUS_LABELS），异常数量高亮
+- `TaskDetailPage` — 三 Tab 页面（基本信息/样本与执行/工作底稿），状态流转按钮（使用 ALLOWED_TRANSITIONS），样本执行矩阵子组件（下拉选择 ✓/×/N/A/PENDING），底稿生成与 Excel 导出
+- `RegulationListPage` — 规章制度列表 + PDF 上传，解析状态展示
+
+**前端 — 路由与布局**：
+- App.tsx 集成 AuthProvider，公开路由 /login，受保护路由自动跳转登录页
+- Layout 侧边栏底部显示用户名/角色/退出登录按钮
+
+#### 遇到的问题与解决方案
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| pnpm 在 SOLO 沙箱中反复 copyfile 失败 | 沙箱文件系统不支持 reflink/hardlink，且网络层间歇性超时导致重装加剧问题 | `.npmrc` 配置 `node-linker=hoisted` + `package-import-method=copy`；**教训：不要无脑 rm -rf node_modules，应诊断后精准修复** |
+| rollup 缺少 linux-arm64-gnu native module | pnpm hoisted 模式下 optional dependencies 平台检测异常 | 根 package.json 添加 `pnpm.supportedArchitectures` 配置 |
+| 新增 bcryptjs/jsonwebtoken 后需重新 pnpm install | Phase 1 新增了 4 个运行时/类型依赖 | **约定：依赖安装命令告诉用户执行，不在沙箱中自行操作** |
+
+#### 当前弱点与待改进项
+
+> ⚠️ 以下是已知的架构弱点，需要在后续 Phase 中解决
+
+| 弱点 | 说明 | 计划解决时机 |
+|------|------|------------|
+| **orgId 硬编码为 'TODO'** | 所有 Service 中 `organizationId` 暂时写死为 'TODO'，因为 auth middleware 只提取了 userId，未查组织关系 | Phase 1 补丁：auth middleware 中查 User.organizationId 并挂到 req 上 |
+| **MinIO 文件上传未实现** | regulation 上传路由中 `storagePath` 只是拼接了路径，未真正上传到 MinIO | Phase 1 补丁或 Phase 2：集成 @aws-sdk/client-s3 |
+| **前端无全局错误处理** | API 请求失败只 console.error，无 toast/通知 | 引入 shadcn/ui 的 toast 组件 |
+| **前端无 loading 骨架屏** | 数据加载只显示"加载中..."文字 | 引入骨架屏组件 |
+| **无 TanStack Query** | 当前直接在组件中 useEffect + fetch，无缓存/重试/失效机制 | 迁移到 TanStack Query |
+| **无 Zustand 状态管理** | 当前只用 React Context (auth)，复杂状态（如任务筛选条件）未持久化 | 按需引入 Zustand store |
+| **seed 脚本未用 tsx 执行** | prisma/seed.ts 使用了 ESM import 但 prisma seed 命令可能需要额外配置 | 在 package.json 中配置 prisma.seed 或直接用 tsx 执行 |
+| **路由缺少新建任务页面** | TaskListPage 有"新建任务"按钮但 /tasks/new 路由未实现 | Phase 1 补丁 |
+| **API 无分页参数校验** | page/pageSize 直接 Number() 转换，无上下限校验 | 添加 Zod 校验中间件 |
+| **无请求速率限制** | API 无 rate limiting，生产环境存在安全风险 | 引入 express-rate-limit |
+
+#### 当前项目结构（Phase 1 后）
+
+```
+icet/
+├── apps/
+│   ├── api/
+│   │   ├── prisma/
+│   │   │   ├── schema.prisma          # 15 个模型
+│   │   │   ├── seed.ts                # 种子数据（3 个测试账号）
+│   │   │   └── migrations/            # 数据库迁移
+│   │   └── src/
+│   │       ├── main.ts                # 入口
+│   │       ├── app.ts                 # 应用工厂
+│   │       ├── db/prisma.ts           # Prisma 客户端
+│   │       ├── middleware/            # error / auth / upload
+│   │       ├── services/              # ★ 6 个 CRUD Service
+│   │       │   ├── auth.service.ts
+│   │       │   ├── scenario.service.ts
+│   │       │   ├── regulation.service.ts
+│   │       │   ├── task.service.ts
+│   │       │   ├── sample.service.ts
+│   │       │   ├── execution.service.ts
+│   │       │   └── paper.service.ts
+│   │       ├── routes/                # ★ 7 组路由（全部接入真实 Service）
+│   │       │   ├── index.ts
+│   │       │   ├── auth.routes.ts
+│   │       │   ├── scenarios.routes.ts
+│   │       │   ├── tasks.routes.ts
+│   │       │   ├── samples.routes.ts
+│   │       │   ├── regulations.routes.ts
+│   │       │   ├── papers.routes.ts
+│   │       │   ├── files.routes.ts
+│   │       │   └── ai.routes.ts
+│   │       └── websocket/server.ts
+│   └── web/
+│       └── src/
+│           ├── App.tsx                # ★ 路由 + AuthProvider
+│           ├── lib/                   # ★ API 客户端 + Auth 上下文
+│           │   ├── api.ts
+│           │   └── auth.tsx
+│           ├── pages/                 # ★ 5 个页面
+│           │   ├── LoginPage.tsx
+│           │   ├── ScenarioListPage.tsx
+│           │   ├── TaskListPage.tsx
+│           │   ├── TaskDetailPage.tsx
+│           │   └── RegulationListPage.tsx
+│           └── components/layout/Layout.tsx
+├── packages/
+│   ├── shared/src/                    # 类型 + 常量 + 工具
+│   └── excel-generator/src/           # Excel 底稿生成
+├── docker-compose.yml
+├── turbo.json
+├── pnpm-workspace.yaml
+├── .npmrc                             # node-linker=hoisted
+└── .env.example
+```
+
 ### 尚未开始开发
-- **Phase 1**：认证（JWT 完整实现）、CRUD API（Service 层 + Controller 真实逻辑）、文件系统（MinIO 集成）、底稿导出（API 端 + 前端组件）
 - **Phase 2**：消息队列（BullMQ + Worker）、WebSocket 进度推送集成、SampleParserAgent、RegulationParserAgent
-- **Phase 3**：PlanGeneratorAgent、TestExecutorAgent（LangGraph 核心图）、前端执行矩阵 UI
+- **Phase 3**：PlanGeneratorAgent、TestExecutorAgent（LangGraph 核心图）、前端执行矩阵 UI 优化
 - **Phase 4**：异常管理、审阅归档流程、Dashboard 统计
 
 ---
