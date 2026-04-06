@@ -44,6 +44,9 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  testerTasks    TestTask[] @relation("TesterTasks")
+  reviewerTasks  TestTask[] @relation("ReviewerTasks")
+
   @@map("users")
 }
 
@@ -170,7 +173,9 @@ model TestTask {
   paperId         String   @map("paper_id")
   unitName        String   @map("unit_name")
   testerId        String   @map("tester_id")
+  tester          User     @relation("TesterTasks", fields: [testerId], references: [id])
   reviewerId      String?  @map("reviewer_id")
+  reviewer        User?    @relation("ReviewerTasks", fields: [reviewerId], references: [id])
   completionDate  String?  @map("completion_date")
   status          String   @default("DRAFT") // DRAFT | PLANNING | PLAN_REVIEW | ...
   samplingMethod  String   @default("随机抽样") @map("sampling_method")
