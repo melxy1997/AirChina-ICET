@@ -7,7 +7,6 @@ import { RedisStore } from 'rate-limit-redis';
 import { redis } from './lib/redis.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { routes } from './routes/index.js';
-import { createHttpServer } from './websocket/server.js';
 
 const DEFAULT_WEB_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173'] as const;
 
@@ -84,5 +83,3 @@ export function createApp() {
 
   return app;
 }
-
-export { createHttpServer };
