@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { usePlan, useUpdatePlan, useApprovePlan } from '@/lib/hooks';
-import type { TestStep, StepExecutionConfig } from '@icet/shared';
+import type { StepExecutionConfig, TestStep } from '@icet/shared';
+import { useEffect, useState } from 'react';
+import { useApprovePlan, usePlan, useUpdatePlan } from '@/lib/hooks';
 
 interface PlanTabProps {
   taskId: string;
@@ -17,7 +17,7 @@ export default function PlanTab({ taskId, isReviewer, currentStatus }: PlanTabPr
   const [formData, setFormData] = useState<{
     controlDescription: string;
     controlIds: string[];
-    steps: { description: string; executionConfig: StepExecutionConfig }[];
+    steps: { id?: string; description: string; executionConfig: StepExecutionConfig }[];
   }>({
     controlDescription: '',
     controlIds: [],
@@ -30,6 +30,7 @@ export default function PlanTab({ taskId, isReviewer, currentStatus }: PlanTabPr
         controlDescription: plan.controlDescription || '',
         controlIds: plan.controlIds || [],
         steps: plan.steps.map((s: any) => ({
+          id: s.id,
           description: s.description,
           executionConfig: s.executionConfig,
         })),
@@ -40,18 +41,30 @@ export default function PlanTab({ taskId, isReviewer, currentStatus }: PlanTabPr
   if (isLoading) return <div className="text-gray-500">加载中...</div>;
 
   const handleSave = () => {
-    updatePlan.mutate({ taskId, ...formData }, {
-      onSuccess: () => setEditMode(false)
-    });
+    // 提交时不需要临时 ID
+    const stepsToSave = formData.steps.map(({ id, ...rest }) => rest);
+    updatePlan.mutate(
+      { taskId, ...formData, steps: stepsToSave },
+      {
+        onSuccess: () => setEditMode(false),
+      },
+    );
   };
 
   const addStep = () => {
     setFormData({
       ...formData,
-      steps: [...formData.steps, { 
-        description: '', 
-        executionConfig: { checkType: 'FREE_FORM', freeFormCheck: { prompt: '', expectedEvidence: '' } } 
-      }]
+          steps: [
+        ...formData.steps,
+        {
+          id: `new-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          description: '',
+          executionConfig: {
+            checkType: 'FREE_FORM_AI',
+            freeFormCheck: { prompt: '', expectedEvidence: '' },
+          },
+        },
+      ],
     });
   };
 
@@ -77,7 +90,8 @@ export default function PlanTab({ taskId, isReviewer, currentStatus }: PlanTabPr
     setFormData({ ...formData, steps: newSteps });
   };
 
-  const canEdit = currentStatus === 'DRAFT' || currentStatus === 'PLANNING' || currentStatus === 'PLAN_REVIEW';
+  const canEdit =
+    currentStatus === 'DRAFT' || currentStatus === 'PLANNING' || currentStatus === 'PLAN_REVIEW';
   const showReviewActions = isReviewer && currentStatus === 'PLAN_REVIEW';
 
   return (
@@ -119,7 +133,7 @@ export default function PlanTab({ taskId, isReviewer, currentStatus }: PlanTabPr
               </div>
               <div className="space-y-3">
                 {formData.steps.map((step, index) => (
-                  <div key={index} className="border rounded p-3 bg-gray-50 relative group">
+                  <div key={step.id} className="border rounded p-3 bg-gray-50 relative group">
                     <div className="flex gap-2 mb-2">
                       <span className="text-gray-400 font-bold">#{index + 1}</span>
                       <input
@@ -129,13 +143,28 @@ export default function PlanTab({ taskId, isReviewer, currentStatus }: PlanTabPr
                         className="flex-1 border rounded px-2 py-1 text-sm"
                       />
                       <div className="flex gap-1">
-                        <button onClick={() => moveStep(index, 'up')} className="p-1 hover:bg-gray-200 rounded">↑</button>
-                        <button onClick={() => moveStep(index, 'down')} className="p-1 hover:bg-gray-200 rounded">↓</button>
-                        <button onClick={() => removeStep(index)} className="p-1 text-red-500 hover:bg-red-50 rounded">×</button>
+                        <button
+                          onClick={() => moveStep(index, 'up')}
+                          className="p-1 hover:bg-gray-200 rounded"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          onClick={() => moveStep(index, 'down')}
+                          className="p-1 hover:bg-gray-200 rounded"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          onClick={() => removeStep(index)}
+                          className="p-1 text-red-500 hover:bg-red-50 rounded"
+                        >
+                          ×
+                        </button>
                       </div>
                     </div>
                     <div>
-                      <select 
+                      <select
                         value={step.executionConfig.checkType}
                         onChange={(e) => {
                           const newSteps = [...formData.steps];
@@ -144,11 +173,11 @@ export default function PlanTab({ taskId, isReviewer, currentStatus }: PlanTabPr
                         }}
                         className="text-xs border rounded p-1"
                       >
-                        <option value="FREE_FORM">人工检查</option>
-                        <option value="SIGNATURE">签名检查</option>
-                        <option value="CONTENT">内容检查</option>
-                        <option value="DATE">日期检查</option>
-                        <option value="AMOUNT">金额检查</option>
+                        <option value="FREE_FORM_AI">人工检查</option>
+                        <option value="SIGNATURE_PRESENCE">签名检查</option>
+                        <option value="CONTENT_EXISTENCE">内容检查</option>
+                        <option value="DATE_VALIDITY">日期检查</option>
+                        <option value="AMOUNT_MATCH">金额检查</option>
                       </select>
                     </div>
                   </div>
@@ -175,13 +204,17 @@ export default function PlanTab({ taskId, isReviewer, currentStatus }: PlanTabPr
         ) : (
           <div className="space-y-4">
             <div>
-              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">控制点描述</h4>
+              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                控制点描述
+              </h4>
               <p className="text-sm text-gray-800 bg-gray-50 p-3 rounded">
                 {plan?.controlDescription || '暂无描述'}
               </p>
             </div>
             <div>
-              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">测试步骤</h4>
+              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                测试步骤
+              </h4>
               {plan?.steps?.length > 0 ? (
                 <div className="space-y-2">
                   {plan.steps.map((s: any, i: number) => (
@@ -233,12 +266,18 @@ export default function PlanTab({ taskId, isReviewer, currentStatus }: PlanTabPr
       )}
 
       {plan?.reviewStatus && plan.reviewStatus !== 'PENDING' && (
-        <div className={`rounded-lg p-4 ${plan.reviewStatus === 'APPROVED' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+        <div
+          className={`rounded-lg p-4 ${plan.reviewStatus === 'APPROVED' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}
+        >
           <div className="flex justify-between items-center">
-            <h4 className={`font-bold text-sm ${plan.reviewStatus === 'APPROVED' ? 'text-green-800' : 'text-red-800'}`}>
+            <h4
+              className={`font-bold text-sm ${plan.reviewStatus === 'APPROVED' ? 'text-green-800' : 'text-red-800'}`}
+            >
               审核结果: {plan.reviewStatus === 'APPROVED' ? '已通过' : '已退回'}
             </h4>
-            <span className="text-xs text-gray-500">{plan.reviewedAt && new Date(plan.reviewedAt).toLocaleString()}</span>
+            <span className="text-xs text-gray-500">
+              {plan.reviewedAt && new Date(plan.reviewedAt).toLocaleString()}
+            </span>
           </div>
           {plan.reviewComment && (
             <p className="text-sm mt-2 text-gray-700 italic">“{plan.reviewComment}”</p>
