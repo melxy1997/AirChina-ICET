@@ -39,6 +39,24 @@ paperRoutes.get(
   }),
 );
 
+/** GET|POST /tasks/:id/paper/export — 导出 Excel（GET 供浏览器/前端 fetch 下载；POST 保留兼容） */
+const exportPaperHandler = asyncHandler(async (req, res) => {
+  const orgId = req.orgId!;
+  await verifyTaskOrg(req.params.id, orgId);
+  const taskId = paramStr(req.params.id);
+  if (!taskId) throw new AppError(400, '无效的任务 ID');
+  const paper = await paperService.generatePaper(taskId, orgId);
+  const buffer = await paperService.exportPaperExcel(paper.id, orgId);
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  );
+  res.setHeader('Content-Disposition', `attachment; filename="working-paper-${taskId}.xlsx"`);
+  res.send(buffer);
+});
+paperRoutes.get('/:id/paper/export', exportPaperHandler);
+paperRoutes.post('/:id/paper/export', exportPaperHandler);
+
 /** POST /tasks/:id/paper/generate */
 paperRoutes.post(
   '/:id/paper/generate',
@@ -50,25 +68,6 @@ paperRoutes.post(
     if (!taskId) throw new AppError(400, '无效的任务 ID');
     const result = await paperService.generatePaper(taskId, orgId, overrides);
     res.json(result);
-  }),
-);
-
-/** POST /tasks/:id/paper/export */
-paperRoutes.post(
-  '/:id/paper/export',
-  asyncHandler(async (req, res) => {
-    const orgId = req.orgId!;
-    await verifyTaskOrg(req.params.id, orgId);
-    const taskId = paramStr(req.params.id);
-    if (!taskId) throw new AppError(400, '无效的任务 ID');
-    const paper = await paperService.generatePaper(taskId, orgId);
-    const buffer = await paperService.exportPaperExcel(paper.id, orgId);
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    );
-    res.setHeader('Content-Disposition', `attachment; filename="working-paper-${taskId}.xlsx"`);
-    res.send(buffer);
   }),
 );
 

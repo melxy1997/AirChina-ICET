@@ -8,6 +8,7 @@ import { regulationRoutes } from './regulations.routes.js';
 import { sampleRoutes } from './samples.routes.js';
 import { scenarioRoutes } from './scenarios.routes.js';
 import { taskRoutes } from './tasks.routes.js';
+import { userRoutes } from './users.routes.js';
 
 export const routes = Router();
 
@@ -15,6 +16,7 @@ export const routes = Router();
 routes.use('/auth', authRoutes);
 
 // 需要认证的路由
+routes.use('/users', userRoutes);
 routes.use('/scenarios', scenarioRoutes);
 routes.use('/tasks', taskRoutes);
 routes.use('/tasks', planRoutes);

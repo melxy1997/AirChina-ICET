@@ -10,14 +10,17 @@ export default defineConfig({
     },
   },
   server: {
+    // 使用 127.0.0.1，避免在 VPN/代理（如 Fake-IP）下 localhost 被解析成 198.18.x.x 导致 EADDRNOTAVAIL
+    host: '127.0.0.1',
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        // 与 server.host 一致用 127.0.0.1，避免 VPN/Fake-IP 下 localhost 解析错误导致代理 ECONNRESET
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:3000',
+        target: 'ws://127.0.0.1:3000',
         ws: true,
       },
     },

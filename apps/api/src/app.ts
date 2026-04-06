@@ -1,6 +1,6 @@
 import cors from 'cors';
 import express from 'express';
-import { rateLimit } from 'express-rate-limit';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { RedisStore } from 'rate-limit-redis';
@@ -9,6 +9,8 @@ import { errorHandler } from './middleware/error.middleware.js';
 import { routes } from './routes/index.js';
 import { createHttpServer } from './websocket/server.js';
 
+const DEFAULT_WEB_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173'] as const;
+
 export function createApp() {
   const app = express();
 
@@ -16,7 +18,7 @@ export function createApp() {
   app.use(helmet());
   app.use(
     cors({
-      origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+      origin: process.env.CORS_ORIGIN ?? [...DEFAULT_WEB_ORIGINS],
       credentials: true,
     }),
   );
@@ -30,14 +32,19 @@ export function createApp() {
     limit: 100, // 每个 IP 限制 100 次
     standardHeaders: true, // 在响应头中返回 `RateLimit-*` 信息
     legacyHeaders: false, // 禁用 `X-RateLimit-*` 信息
+    // 开发环境 Redis 未启动时仍放行请求，避免登录等接口 500 / 连接异常
+    passOnStoreError: process.env.NODE_ENV !== 'production',
     store: new RedisStore({
       // @ts-expect-error - ioredis type mismatch with express-rate-limit
       sendCommand: (...args: string[]) => redis.call(...args),
       prefix: 'icet:rate-limit:',
     }),
     keyGenerator: (req) => {
-      // 优先使用已认证用户的 ID，否则回退到 IP
-      return (req as any).userId || req.ip || 'anonymous';
+      const userId = (req as express.Request & { userId?: string }).userId;
+      if (userId) return userId;
+      const ip = req.ip;
+      if (!ip) return 'anonymous';
+      return ipKeyGenerator(ip);
     },
     message: { error: { message: '请求过于频繁，请稍后再试' } },
   });

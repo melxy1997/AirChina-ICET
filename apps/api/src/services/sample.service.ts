@@ -1,3 +1,4 @@
+import { decodeMultipartFilename } from '../lib/multipart-filename.js';
 import { prisma } from '../db/prisma.js';
 import { AppError } from '../middleware/error.middleware.js';
 
@@ -25,14 +26,24 @@ export async function listSamples(taskId: string) {
     },
   });
   if (!set) return { sampleSetId: null, samples: [] };
-  return { sampleSetId: set.id, samples: set.samples };
+  const samples = set.samples.map((s) => ({
+    ...s,
+    files: s.files.map((f) => ({
+      ...f,
+      fileRef: {
+        ...f.fileRef,
+        originalName: decodeMultipartFilename(f.fileRef.originalName),
+      },
+    })),
+  }));
+  return { sampleSetId: set.id, samples };
 }
 
 export async function addSample(
   taskId: string,
   data: {
     no: number;
-    content: string;
+    content?: string;
     fileIds?: string[];
     remark?: string;
     addedBy: string;
@@ -40,11 +51,12 @@ export async function addSample(
 ) {
   const set = await getOrCreateSampleSet(taskId);
 
+  const text = data.content?.trim() ?? '';
   return prisma.sample.create({
     data: {
       sampleSetId: set.id,
       no: data.no,
-      content: data.content,
+      content: text,
       remark: data.remark,
       addedBy: data.addedBy,
       files: data.fileIds?.length

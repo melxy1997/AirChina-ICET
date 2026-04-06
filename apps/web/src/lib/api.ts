@@ -2,8 +2,9 @@ const BASE = '/api/v1';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = localStorage.getItem('token');
+  const isFormData = typeof FormData !== 'undefined' && init?.body instanceof FormData;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...((init?.headers as Record<string, string>) ?? {}),
   };
   if (token) {

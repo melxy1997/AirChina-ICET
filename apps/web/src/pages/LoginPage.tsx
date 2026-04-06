@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 
 export default function LoginPage() {
+  const navigate = useNavigate();
   const { login } = useAuth();
   const [email, setEmail] = useState('admin@icet.dev');
   const [password, setPassword] = useState('admin123');
@@ -14,6 +16,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
+      navigate('/', { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '登录失败');
     } finally {

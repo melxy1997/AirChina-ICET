@@ -6,6 +6,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { decodeMultipartFilename } from '../lib/multipart-filename.js';
 import { prisma } from '../db/prisma.js';
 import { AppError } from '../middleware/error.middleware.js';
 
@@ -15,14 +16,18 @@ let s3Client: S3Client | null = null;
 
 function getS3Client(): S3Client {
   if (!s3Client) {
+    // MinIO 等 S3 兼容服务：SDK 默认 WHEN_SUPPORTED 会为 PutObject 附加 flexible checksum 头，
+    // 常与 MinIO 的 SigV4 校验不一致 → SignatureDoesNotMatch。开发环境用 WHEN_REQUIRED 关闭默认校验头。
     s3Client = new S3Client({
       endpoint: process.env.S3_ENDPOINT || 'http://127.0.0.1:9000',
-      region: 'us-east-1',
+      region: process.env.S3_REGION || 'us-east-1',
       credentials: {
         accessKeyId: process.env.S3_ACCESS_KEY || 'minioadmin',
         secretAccessKey: process.env.S3_SECRET_KEY || 'minioadmin',
       },
       forcePathStyle: true,
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
     });
   }
   return s3Client;
@@ -61,6 +66,8 @@ export async function uploadFile(data: {
   const checksum = crypto.createHash('sha256').update(data.buffer).digest('hex');
 
   const client = getS3Client();
+  // S3 Metadata 仅允许 ASCII；中文文件名会导致部分兼容存储签名异常，故用 base64 保留原名
+  const safeMetaName = Buffer.from(data.originalName, 'utf8').toString('base64');
   await client.send(
     new PutObjectCommand({
       Bucket: BUCKET,
@@ -68,7 +75,7 @@ export async function uploadFile(data: {
       Body: data.buffer,
       ContentType: data.mimeType,
       Metadata: {
-        'original-name': data.originalName,
+        'original-name-b64': safeMetaName,
         checksum,
       },
     }),
@@ -97,12 +104,13 @@ export async function getDownloadUrl(fileRefId: string): Promise<string> {
   if (!fileRef) throw new AppError(404, '文件不存在');
 
   const client = getS3Client();
+  const displayName = decodeMultipartFilename(fileRef.originalName);
   const url = await getSignedUrl(
     client,
     new GetObjectCommand({
       Bucket: BUCKET,
       Key: fileRef.storagePath,
-      ResponseContentDisposition: `attachment; filename="${encodeURIComponent(fileRef.originalName)}"`,
+      ResponseContentDisposition: `attachment; filename="${encodeURIComponent(displayName)}"`,
     }),
     { expiresIn: 3600 },
   );
@@ -126,7 +134,7 @@ export async function getFileStream(fileRefId: string) {
   return {
     stream: response.Body,
     contentType: fileRef.mimeType,
-    originalName: fileRef.originalName,
+    originalName: decodeMultipartFilename(fileRef.originalName),
     sizeBytes: fileRef.sizeBytes,
   };
 }

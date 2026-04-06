@@ -110,8 +110,10 @@ export async function updateTask(
   orgId: string,
   data: {
     paperId?: string;
-    completionDate?: string;
-    reviewerId?: string;
+    unitName?: string;
+    testerId?: string;
+    completionDate?: string | null;
+    reviewerId?: string | null;
     samplingMethod?: string;
     samplingPeriod?: string;
     samplingSource?: string;

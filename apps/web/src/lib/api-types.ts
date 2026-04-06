@@ -30,9 +30,11 @@ export interface TaskDetailApi {
   status: string;
   samplingMethod?: string;
   samplingPeriod?: string;
+  samplingSource?: string;
   completionDate?: string | null;
   scenario?: { processLevel1?: string; processLevel2?: string };
-  tester?: { name?: string };
+  tester?: { id?: string; name?: string };
+  testerId?: string;
   reviewer?: { id?: string; name?: string };
   reviewerId?: string | null;
   plan?: {
@@ -52,12 +54,19 @@ export interface StepExecutionView {
   result: string;
 }
 
+/** 与 GET /tasks/:id/samples 中 samples[].files 对齐 */
+export interface SampleFileLink {
+  fileRef: { id: string; originalName: string; fileType?: string };
+}
+
 export interface SampleView {
   id: string;
   no: number;
   content: string;
   remark?: string | null;
   stepExecutions: StepExecutionView[];
+  /** 样本材料包：多文件或单个 zip 等，经 FileReference 关联 */
+  files?: SampleFileLink[];
 }
 
 export interface RegulationListItem {

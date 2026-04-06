@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { paramStr } from '../lib/req-params.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { AppError, asyncHandler } from '../middleware/error.middleware.js';
+import { decodeMultipartFilename } from '../lib/multipart-filename.js';
 import { uploadMemory } from '../middleware/upload.middleware.js';
 import * as fileService from '../services/file.service.js';
 import * as regulationService from '../services/regulation.service.js';
@@ -32,11 +33,12 @@ regulationRoutes.post(
     const userId = req.userId!;
     const orgId = req.orgId!;
     const body = req.body;
+    const originalName = decodeMultipartFilename(req.file.originalname);
 
     // 上传文件到 S3
     const fileRef = await fileService.uploadFile({
       buffer: req.file.buffer,
-      originalName: req.file.originalname,
+      originalName,
       mimeType: req.file.mimetype,
       uploadedBy: userId,
       prefix: 'regulations',
@@ -44,7 +46,7 @@ regulationRoutes.post(
 
     const result = await regulationService.createRegulation({
       organizationId: orgId,
-      title: body.title || req.file.originalname,
+      title: body.title || originalName,
       version: body.version || '1.0',
       effectiveDate: body.effectiveDate || undefined,
       expiryDate: body.expiryDate || undefined,

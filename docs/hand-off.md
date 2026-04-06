@@ -625,6 +625,62 @@ icet/
 - **审核流**：审阅人支持一键审核通过或退回并填写意见。
 - **状态管理**：集成 TanStack Query 保证数据一致性。
 
+### 2026-04-07 问题修复记录
+
+#### 1. 开发环境网络与监听问题
+- **现象**：Vite 启动报错 `EADDRNOTAVAIL: address not available 198.18.0.109:5173`。
+- **原因**：本地开启了 VPN/Clash（Fake-IP 模式），导致 `localhost` 被解析到 `198.18.x.x` 这种非本机网卡地址。
+- **解决**：在 `apps/web/vite.config.ts` 中显式固定 `server.host: '127.0.0.1'`；同步修改前端代理目标及后端 CORS 配置为 `127.0.0.1`。
+
+#### 2. 限流中间件与 IPv6 校验
+- **现象**：API 启动报错 `ERR_ERL_KEY_GEN_IPV6`。
+- **原因**：`express-rate-limit` v8 要求自定义 `keyGenerator` 处理 IP 回退时必须调用 `ipKeyGenerator` 辅助函数以防止 IPv6 绕过。
+- **解决**：在 `apps/api/src/app.ts` 中引入并使用 `ipKeyGenerator(req.ip)`。
+
+#### 3. 登录与任务创建流程修复
+- **现象**：登录 200 后前端无反应；创建任务时 `reviewerId` 为空导致 500。
+- **原因**：
+    - 登录成功后缺少 `navigate` 跳转逻辑。
+    - Zod 对 `reviewerId` 的 `uuid().optional()` 不接受空字符串 `""`；且 API 错误处理未拦截 `ZodError` 导致降级为 500。
+- **解决**：
+    - 在 `LoginPage.tsx` 增加跳转。
+    - 后端增加 `ZodError` 到 400 的转换中间件，并对 UUID 字段增加 `z.preprocess` 预处理空串。
+
+#### 4. 样本与执行模块（材料包）完善
+- **现象**：原「样本与执行」Tab 仅有文字展示，无录入入口，且执行矩阵列显示异常。
+- **原因**：前端未实现 `POST /samples` 的调用；矩阵表头错误地依赖样本数据而非测试计划步骤。
+- **解决**：
+    - 重构 `TaskDetailPage` 里的样本面板，增加「添加样本」表单。
+    - 支持**多文件上传**（材料包概念），允许「仅附件无文字说明」的样本记录。
+    - 修正矩阵逻辑：以**测试计划步骤**为固定列，按索引匹配样本执行结果。
+
+#### 5. S3/MinIO 上传兼容性与乱码
+- **现象**：上传 PDF/Markdown 报 `SignatureDoesNotMatch` (403)；中文文件名显示乱码。
+- **原因**：
+    - AWS SDK v3 默认开启的 Flexible Checksums 与 MinIO 签名算法不完全兼容。
+    - Multer/Node 默认将 multipart 里的 UTF-8 文件名按 `latin1` 解码。
+- **解决**：
+    - S3 客户端配置 `requestChecksumCalculation: 'WHEN_REQUIRED'`。
+    - S3 Metadata 中的文件名进行 Base64 编码。
+    - 实现 `decodeMultipartFilename` 工具函数，手动修复 `latin1` -> `utf8` 的误读。
+
+#### 6. 工作底稿预览与导出
+- **现象**：导出 Excel 报 404；生成底稿后前端无感知。
+- **原因**：
+    - 前端 `downloadFile` 使用 GET 请求，但后端只注册了 POST 路由。
+    - 前端预览逻辑访问了错误的数据结构（`results` 对象 vs `stepResults` 数组）。
+- **解决**：
+    - 后端 `papers.routes.ts` 增加 GET 导出路由支持。
+    - 前端实现全量「底稿预览」视图，支持版本展示、自动汇总统计、实时预览矩阵。
+    - 修复统计逻辑中 `Object.values` 导致的 TypeError。
+
+#### 7. 任务基本信息编辑
+- **现象**：任务创建后无法修改执行人、审阅人、抽样期间等基本信息。
+- **解决**：
+    - 新增 `GET /users` 接口供组织内人员选择。
+    - 扩展 `updateTask` 接口字段。
+    - 在 `TaskDetailPage` 增加「编辑基本信息」模式。
+
 ### 尚未开始开发
 - **Phase 2**：消息队列（BullMQ + Worker）、WebSocket 进度推送集成、SampleParserAgent、RegulationParserAgent
 - **Phase 3**：PlanGeneratorAgent、TestExecutorAgent（LangGraph 核心图）、前端执行矩阵 UI 优化

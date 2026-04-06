@@ -10,12 +10,22 @@ import * as sampleService from '../services/sample.service.js';
 export const sampleRoutes = Router();
 sampleRoutes.use(requireAuth);
 
-const addSampleSchema = z.object({
-  no: z.number().int().positive(),
-  content: z.string().min(1, '样本内容不能为空'),
-  fileIds: z.array(z.string().uuid()).optional(),
-  remark: z.string().optional(),
-});
+const addSampleSchema = z
+  .object({
+    no: z.number().int().positive(),
+    content: z.string().optional(),
+    fileIds: z.array(z.string().uuid()).optional(),
+    remark: z.string().optional(),
+  })
+  .refine(
+    (d) =>
+      (d.content?.trim()?.length ?? 0) > 0 ||
+      (Array.isArray(d.fileIds) && d.fileIds.length > 0),
+    {
+      message: '请填写样本说明，或上传至少一个附件（可多文件，也可打一个 zip 包上传）',
+      path: ['content'],
+    },
+  );
 
 const updateResultSchema = z.object({
   result: z.string(),

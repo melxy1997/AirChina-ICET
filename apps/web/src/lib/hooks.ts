@@ -18,6 +18,7 @@ export const queryKeys = {
   regulations: (page?: number) => ['regulations', page] as const,
   regulation: (id: string) => ['regulation', id] as const,
   plan: (taskId: string) => ['plan', taskId] as const,
+  paper: (taskId: string) => ['paper', taskId] as const,
 };
 
 // ── Scenario Hooks ──
@@ -79,6 +80,24 @@ export function useTask(id: string) {
     queryKey: queryKeys.task(id),
     queryFn: () => api.get<TaskDetailApi>(`/tasks/${id}`),
     enabled: !!id,
+  });
+}
+
+export function useOrgUsers() {
+  return useQuery({
+    queryKey: ['org-users'] as const,
+    queryFn: () => api.get<{ data: { id: string; name: string; email: string; role: string }[] }>('/users'),
+  });
+}
+
+export function useUpdateTask(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.put(`/tasks/${taskId}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.task(taskId) });
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+    },
   });
 }
 
@@ -154,7 +173,19 @@ export function useGeneratePaper() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (taskId: string) => api.post(`/tasks/${taskId}/paper/generate`),
-    onSuccess: (_data, taskId) => qc.invalidateQueries({ queryKey: queryKeys.task(taskId) }),
+    onSuccess: (_data, taskId) => {
+      qc.invalidateQueries({ queryKey: queryKeys.task(taskId) });
+      qc.invalidateQueries({ queryKey: queryKeys.paper(taskId) });
+    },
+  });
+}
+
+export function usePaper(taskId: string) {
+  return useQuery({
+    queryKey: queryKeys.paper(taskId),
+    queryFn: () => api.get<any>(`/tasks/${taskId}/paper`),
+    enabled: !!taskId,
+    retry: false,
   });
 }
 

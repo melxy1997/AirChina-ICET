@@ -14,7 +14,10 @@ const createSchema = z.object({
   paperId: z.string().min(1, '底稿编号不能为空'),
   unitName: z.string().min(1, '测试单位不能为空'),
   testerId: z.string().uuid(),
-  reviewerId: z.string().uuid().optional(),
+  reviewerId: z.preprocess(
+    (v) => (v === '' || v === null ? undefined : v),
+    z.string().uuid().optional(),
+  ),
   regulationIds: z.array(z.string().uuid()).default([]),
   samplingMethod: z.string().default('随机抽样'),
   samplingPeriod: z.string().default(''),
@@ -25,6 +28,22 @@ const transitionSchema = z.object({
   status: z.string(),
   comment: z.string().optional(),
 });
+
+const updateTaskSchema = z
+  .object({
+    paperId: z.string().min(1).optional(),
+    unitName: z.string().min(1).optional(),
+    testerId: z.string().uuid().optional(),
+    reviewerId: z.preprocess(
+      (v) => (v === '' || v === null ? null : v),
+      z.union([z.string().uuid(), z.null()]).optional(),
+    ),
+    completionDate: z.union([z.string().min(1), z.null()]).optional(),
+    samplingMethod: z.string().optional(),
+    samplingPeriod: z.string().optional(),
+    samplingSource: z.string().optional(),
+  })
+  .strict();
 
 /** GET /tasks */
 taskRoutes.get(
@@ -73,8 +92,8 @@ taskRoutes.put(
   '/:id',
   asyncHandler(async (req, res) => {
     const orgId = req.orgId!;
-    const data = req.body;
-    const result = await taskService.updateTask(paramStr(req.params.id), orgId, data);
+    const parsed = updateTaskSchema.parse(req.body);
+    const result = await taskService.updateTask(paramStr(req.params.id), orgId, parsed);
     res.json(result);
   }),
 );

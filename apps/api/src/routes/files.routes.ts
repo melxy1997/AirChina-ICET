@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { paramStr } from '../lib/req-params.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { AppError, asyncHandler } from '../middleware/error.middleware.js';
+import { decodeMultipartFilename } from '../lib/multipart-filename.js';
 import { uploadMemory } from '../middleware/upload.middleware.js';
 import * as fileService from '../services/file.service.js';
 
@@ -20,7 +21,7 @@ fileRoutes.post(
     const prefix = (req.body.prefix as string) || undefined;
     const fileRef = await fileService.uploadFile({
       buffer: req.file.buffer,
-      originalName: req.file.originalname,
+      originalName: decodeMultipartFilename(req.file.originalname),
       mimeType: req.file.mimetype,
       uploadedBy: userId,
       prefix,

@@ -14,12 +14,12 @@ export default function TaskNewPage() {
   const { data: scenarioData } = useScenarios();
   const scenarios = scenarioData?.data ?? [];
 
+  // 新建任务仅采集当前流程需要的字段。reviewer（审核人）在模型中为可选，通常在任务推进或分配时再指定，此处不提交。
   const [form, setForm] = useState({
     scenarioId: '',
     paperId: '',
     unitName: '',
     testerId: user?.id || '',
-    reviewerId: '',
     regulationIds: [] as string[],
     samplingMethod: '随机抽样',
     samplingPeriod: '',
@@ -32,8 +32,9 @@ export default function TaskNewPage() {
       const task = await createTask.mutateAsync(form);
       toast('任务创建成功', 'success');
       navigate(`/tasks/${task.id}`);
-    } catch {
-      // Error already handled by QueryErrorHandler
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '创建失败';
+      toast(message, 'error');
     }
   };
 

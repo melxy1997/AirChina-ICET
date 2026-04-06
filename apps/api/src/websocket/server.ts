@@ -6,7 +6,7 @@ export function initWebSocket(httpServer: HttpServer): void {
   const { Server } = require('socket.io');
   const socketServer = new Server(httpServer, {
     cors: {
-      origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+      origin: process.env.CORS_ORIGIN ?? ['http://localhost:5173', 'http://127.0.0.1:5173'],
       methods: ['GET', 'POST'],
     },
   });
