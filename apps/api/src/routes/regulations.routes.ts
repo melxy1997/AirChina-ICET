@@ -6,6 +6,7 @@ import { decodeMultipartFilename } from '../lib/multipart-filename.js';
 import { uploadMemory } from '../middleware/upload.middleware.js';
 import * as fileService from '../services/file.service.js';
 import * as regulationService from '../services/regulation.service.js';
+import * as aiJobService from '../services/ai-job.service.js';
 
 export const regulationRoutes = Router();
 regulationRoutes.use(requireAuth);
@@ -74,5 +75,27 @@ regulationRoutes.delete(
     const orgId = req.orgId!;
     await regulationService.deleteRegulation(paramStr(req.params.id), orgId);
     res.json({ success: true });
+  }),
+);
+
+/** POST /regulations/:id/parse - 触发 AI 解析规章制度 */
+regulationRoutes.post(
+  '/:id/parse',
+  asyncHandler(async (req, res) => {
+    const orgId = req.orgId!;
+    const regulationId = paramStr(req.params.id);
+    if (!regulationId) throw new AppError(400, '无效的规章 ID');
+
+    const regulation = await regulationService.getRegulation(regulationId, orgId);
+    if (!regulation) throw new AppError(404, '规章制度不存在');
+
+    const job = await aiJobService.createJob(
+      'PARSE_REGULATION',
+      'Regulation',
+      regulationId,
+      'REGULATION_PARSER',
+    );
+
+    res.status(202).json({ jobId: job.id });
   }),
 );
