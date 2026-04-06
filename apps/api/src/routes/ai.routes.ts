@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { requireAuth } from '../middleware/auth.middleware.js';
+import { paramStr } from '../lib/req-params.js';
 import { AppError, asyncHandler } from '../middleware/error.middleware.js';
+import { requireAuth } from '../middleware/auth.middleware.js';
 import * as aiJobService from '../services/ai-job.service.js';
 
 export const aiRoutes = Router();
@@ -11,7 +12,9 @@ aiRoutes.use(requireAuth);
 aiRoutes.get(
   '/:id',
   asyncHandler(async (req, res) => {
-    const job = await aiJobService.getJobById(req.params.id);
+    const id = paramStr(req.params.id);
+    if (!id) throw new AppError(400, '无效的任务 ID');
+    const job = await aiJobService.getJobById(id);
     res.json(job);
   }),
 );
@@ -20,7 +23,9 @@ aiRoutes.get(
 aiRoutes.post(
   '/:id/cancel',
   asyncHandler(async (req, res) => {
-    const job = await aiJobService.cancelJob(req.params.id);
+    const id = paramStr(req.params.id);
+    if (!id) throw new AppError(400, '无效的任务 ID');
+    const job = await aiJobService.cancelJob(id);
     res.json(job);
   }),
 );

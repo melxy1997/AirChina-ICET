@@ -67,7 +67,13 @@ export async function runSampleParser(jobId: string, sampleId: string): Promise<
     const chunks: Buffer[] = [];
     if (stream && typeof (stream as NodeJS.ReadableStream)[Symbol.asyncIterator] === 'function') {
       for await (const chunk of stream as NodeJS.ReadableStream) {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array));
+        if (Buffer.isBuffer(chunk)) {
+          chunks.push(chunk);
+        } else if (typeof chunk === 'string') {
+          chunks.push(Buffer.from(chunk, 'binary'));
+        } else {
+          chunks.push(Buffer.from(chunk as Uint8Array));
+        }
       }
     }
     const buffer = Buffer.concat(chunks);
@@ -107,7 +113,8 @@ export async function runSampleParser(jobId: string, sampleId: string): Promise<
 
   await prisma.sample.update({
     where: { id: sampleId },
-    data: { parsedContent },
+    // biome-ignore lint/suspicious/noExplicitAny: Prisma JSON field
+    data: { parsedContent: parsedContent as any },
   });
 
   await aiJobService.completeJob(jobId, 'Sample', sampleId, tokensUsed);

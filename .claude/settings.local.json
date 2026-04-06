@@ -4,7 +4,8 @@
       "Bash(pnpm --filter @icet/api add:*)",
       "Bash(pnpm --filter @icet/web add:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(pnpm --filter:*)"
     ]
   }
 }
