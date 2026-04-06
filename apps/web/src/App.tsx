@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import ScenarioListPage from './pages/ScenarioListPage';
 import TaskListPage from './pages/TaskListPage';
 import TaskDetailPage from './pages/TaskDetailPage';
+import TaskNewPage from './pages/TaskNewPage';
 import RegulationListPage from './pages/RegulationListPage';
 
 function ProtectedRoutes() {
@@ -21,6 +22,7 @@ function ProtectedRoutes() {
           <Route path="/scenarios" element={<ScenarioListPage />} />
           <Route path="/regulations" element={<RegulationListPage />} />
           <Route path="/tasks" element={<TaskListPage />} />
+          <Route path="/tasks/new" element={<TaskNewPage />} />
           <Route path="/tasks/:id" element={<TaskDetailPage />} />
           <Route path="/papers" element={<div>底稿归档 - Coming Soon</div>} />
         </Route>
