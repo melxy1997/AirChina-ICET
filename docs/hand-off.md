@@ -682,9 +682,149 @@ icet/
     - 在 `TaskDetailPage` 增加「编辑基本信息」模式。
 
 ### 尚未开始开发
-- **Phase 2**：消息队列（BullMQ + Worker）、WebSocket 进度推送集成、SampleParserAgent、RegulationParserAgent
 - **Phase 3**：PlanGeneratorAgent、TestExecutorAgent（LangGraph 核心图）、前端执行矩阵 UI 优化
 - **Phase 4**：异常管理、审阅归档流程、Dashboard 统计
+
+### ✅ Phase 2：AI 基础能力（已完成）
+
+> 完成时间：2026-04-07
+> 分支：`feature/solo`
+> 提交数：12 个逻辑提交 + 1 个 TypeScript 修复提交
+
+#### 完成内容
+
+| Commit | 说明 |
+|--------|------|
+| `feat(deps): install bullmq, openai, pdf-parse for Phase 2 AI infrastructure` | 安装 bullmq / openai / pdf-parse / @types/pdf-parse（api）、socket.io-client（web） |
+| `feat(api): add BullMQ queue definition and AIJobService` | `queue/ai-job.queue.ts` Queue 定义；`services/ai-job.service.ts` 完整 CRUD；`routes/ai.routes.ts` 接入真实逻辑 |
+| `feat(api): add BullMQ worker with job type dispatcher` | `queue/worker.ts` Worker 骨架，switch/case 按 type 分发；`main.ts` 调用 `startWorker()` |
+| `feat(api): initialize Socket.IO with HTTP server for real-time AI progress events` | `websocket/server.ts` 完整重写为 ESM；新增 `regulation:join/leave` + `broadcastRegulation()`；`main.ts` 改用 `createServer(app)` + `httpServer.listen()`；`app.ts` 删除冗余 `createHttpServer` 导出 |
+| `feat(web): add socket.io-client singleton and useTaskSocket hook` | `lib/socket.ts` 单例管理；`hooks/useTaskSocket.ts` 订阅四类事件；`vite.config.ts` 新增 `/socket.io` WS 代理 |
+| `feat(web): add AIJobMonitor component and wire useTaskSocket into TaskDetailPage` | `components/AIJobMonitor.tsx` 进度条 + 状态标识；`lib/hooks.ts` 添加 `useAIJob()` + `aiJob` queryKey；`lib/api-types.ts` 新增 `AIJobView`；`TaskDetailPage` 顶层注入 `useTaskSocket(id)` |
+| `feat(api): add OpenAI client wrapper and structured JSON extraction utility` | `lib/llm.ts`：单例 OpenAI 实例、`callLLM()`、`extractJSON<T>()` |
+| `feat(api): add PDF text extraction utility using pdf-parse` | `agents/tools/pdf-extractor.ts`：`extractPdfText()`（按页）+ `extractPdfFullText()` |
+| `feat(api): implement SampleParserAgent for structured PDF sample parsing` | `agents/sample-parser/`：prompts + `runSampleParser()`；`samples.routes.ts` 新增 `POST /tasks/:id/samples/:sid/parse` |
+| `feat(api): implement RegulationParserAgent for control point extraction` | `agents/regulation-parser/`：prompts + `runRegulationParser()`（分批+去重+事务）；`regulations.routes.ts` 新增 `POST /regulations/:id/parse` |
+| `feat(web): add parse trigger buttons and AI progress display for regulations and samples` | `RegulationListPage` 解析按钮 + 内联 AIJobMonitor；`TaskDetailPage` SampleMatrix 增加「AI 解析」列；`hooks.ts` 新增 `useParseRegulation()` / `useParseSample()` |
+| `feat(shared): add WebSocket event types and finalize Phase 2 integration` | `packages/shared/src/types/ws-events.ts`：`WSEventMap`、四个 Event 接口；`types/index.ts` re-export |
+| `fix(api): resolve TypeScript errors in PDF extractor and agent files` | 修复 pdf-parse CJS/ESM 互操作、Buffer 类型收窄、Prisma JSON 字段 cast |
+
+#### 实现细节
+
+**后端 — BullMQ 消息队列**：
+- `queue/ai-job.queue.ts` — Queue 单例，`defaultJobOptions`：attempts=3、指数退避（delay=5000ms）、完成后保留 100 条、失败后保留 200 条
+- `queue/worker.ts` — Worker 绑定同一 Redis 连接，concurrency=3，switch/case 按 `type` 动态 import agent 模块（避免启动时全量加载），catch 块调 `failJob()` 后重新 throw（让 BullMQ 进行重试计数）
+- 两者均复用 `lib/redis.ts` 的单例（已设 `maxRetriesPerRequest: null`，BullMQ 兼容性要求）
+
+**后端 — AIJobService**：
+- `createJob()` — DB 写入（QUEUED）→ 入队，原子化保证 DB 和队列一致
+- `updateProgress()` — DB 更新 + `broadcast()` 推送 `ai_job.progress` 事件
+- `completeJob()` — DB 更新（COMPLETED + completedAt + durationMs + tokensUsed）+ `broadcast()` 推送 `ai_job.completed`
+- `failJob()` — DB 更新（FAILED + errorMessage + errorStack）+ broadcast
+- Worker 入队后先将 DB 状态改为 RUNNING（防止客户端查到一直是 QUEUED）
+
+**后端 — WebSocket 修复**：
+- 原有 `initWebSocket` 内用 `require()`（CJS），不符合项目 ESM 规范（会在 tsx 模式下运行时报警告）
+- 重写为静态 `import { Server } from 'socket.io'`
+- 原 `main.ts` 直接 `app.listen()` 会创建独立 HTTP Server，Socket.IO 无法附加其上；改为 `createServer(app)` + `initWebSocket(httpServer)` + `httpServer.listen()`，HTTP 请求和 WebSocket 握手共用同一端口
+
+**后端 — PDF 解析工具**：
+- `pdf-parse` 是 CJS 包，在 ESM 项目中 `import pdfParse from 'pdf-parse'` 会因无 default export 报 TS1192；采用 `import * as pdfParseModule` + runtime CJS/ESM 互操作 fallback（`(module as any).default ?? module`）解决
+- `extractPdfText()` 使用 `pagerender` hook 获取逐页文本；`extractPdfFullText()` 使用顶层 `text` 字段
+
+**后端 — SampleParserAgent**：
+- 加载 Sample + SampleFileRef（过滤 PDF）→ S3 流式下载（`getFileStream`）→ `extractPdfFullText()` → 拼接全文（截断至 12000 字防 token 溢出）→ `callLLM(jsonMode:true)` → 解析 JSON → `prisma.sample.update({ parsedContent })`
+- 输出结构：`{ signatures[], dates[], amounts[], structureSummary, summary, parsedAt, pages }`
+
+**后端 — RegulationParserAgent**：
+- 单 PDF → 全文提取 → 按 8000 字符切批 → 每批 `callLLM()` 提取 `ControlPoint[]` → 累积所有批次结果 → `deduplicateControls()`（按 controlId Map 去重，先出现的优先）→ Prisma 事务（deleteMany 旧控制点 → createMany 新控制点 → 更新 parseStatus=COMPLETED）
+- 先更新 parseStatus=RUNNING，防止用户在解析期间重复触发
+
+**前端 — Socket 管理**：
+- `lib/socket.ts` 单例模式，防止组件多次挂载时建立多连接；`disconnectSocket()` 供需要时清理
+- `hooks/useTaskSocket.ts` 在 useEffect 中 join/leave 房间，组件卸载时清理所有监听器，防止内存泄漏和重复响应
+- Vite 配置增加 `/socket.io` WS 代理（原有 `/ws` 代理是预留的，socket.io 默认路径是 `/socket.io`）
+
+**前端 — AIJobMonitor**：
+- 通过 `useAIJob(jobId)` 轮询（QUEUED/RUNNING 时每 3s，终态停止），同时被 Socket 事件实时更新（socket 更新 `setQueryData`，无需等待下一次轮询）
+- 颜色状态：RUNNING=蓝色进度条，COMPLETED=绿色，FAILED=红色 + 显示错误信息
+
+#### 架构决策记录
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| LLM SDK | 直接调用 openai（非 LangChain） | Phase 2 只需简单 prompt→response 链，LangChain 在此阶段引入只增加复杂度；Phase 3 引入 LangGraph 时再统一 |
+| Worker 部署模式 | 同进程（main.ts 调用 `startWorker()`） | 开发阶段一个 `pnpm dev` 命令即可；共享 Prisma 和 Socket.IO 实例，无需 IPC；生产时可拆分到独立进程 |
+| PDF 解析 | pdf-parse，不做 OCR | 基础文本提取已满足 Phase 2 需求；扫描件 OCR（Tesseract）留到后续 Phase |
+| WebSocket 房间 | task 用 `task:${taskId}`，regulation 用 `regulation:${regulationId}` | Regulation 是组织级资源，不隶属于某个 Task，分开房间更精准；避免跨任务的 regulation 解析事件污染 task 页面 |
+| BullMQ 连接 | 复用 `lib/redis.ts` 单例 | 已有 `maxRetriesPerRequest: null`（BullMQ 硬性要求），无需额外配置 |
+| Worker 动态 import | `await import('../agents/...')` | 避免 main.ts 启动时加载所有 agent 代码，保持冷启动速度；同时使 agent 模块可独立替换 |
+
+#### 遇到的问题与解决方案
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| `pdf-parse` default export 缺失（TS1192） | 该包是 CJS，没有 ESM default export；TypeScript strict 模式下 `import pdfParse from 'pdf-parse'` 报错 | 改用 `import * as pdfParseModule`，运行时取 `.default ?? module` 以兼容 CJS interop |
+| Buffer.from 类型错误 | S3 stream chunk 的 TypeScript 类型是 `string \| Buffer \| Uint8Array` 等联合类型，直接 cast 到 `ArrayBuffer` 报 TS2352 | 用 `if/else if/else` 按实际类型分支处理，消除 cast |
+| Prisma JSON 字段类型不兼容 | `parsedContent` 字段是 Prisma `Json?` 类型，接受 `InputJsonValue` 类型，而自定义接口类型不直接满足 index signature 约束 | 显式 cast `parsedContent as any`，加 biome-ignore 注释标注原因 |
+| 原 `initWebSocket` 用 `require()` | 历史骨架代码混用了 CJS `require()`，在 ESM 项目中运行时有警告，ts 下也不规范 | 重写为 `import { Server } from 'socket.io'` 静态 ESM import |
+| `app.listen()` 无法挂载 Socket.IO | Express `app.listen()` 内部创建了新的 HTTP Server，返回的是该 Server 引用；但 Socket.IO 需要在创建前获得 Server 实例并注入 | 改为 `const httpServer = createServer(app)`，先挂载 Socket.IO，再 `httpServer.listen(PORT)` |
+
+#### 当前已就绪的 Phase 2 能力
+
+| 能力 | API 端点 | 状态 |
+|------|----------|------|
+| 触发规章解析 | `POST /regulations/:id/parse` | ✅ |
+| 触发样本解析 | `POST /tasks/:id/samples/:sid/parse` | ✅ |
+| 查询 AI 任务状态 | `GET /ai-jobs/:id` | ✅ |
+| 取消 AI 任务 | `POST /ai-jobs/:id/cancel` | ✅ |
+| WebSocket 进度推送 | `ai_job.progress` / `ai_job.completed` / `ai_job.failed` | ✅ |
+| 前端实时进度展示 | AIJobMonitor 组件 + useTaskSocket | ✅ |
+
+#### 当前项目结构（Phase 2 后）
+
+```
+apps/api/src/
+├── agents/                              ← Phase 2 新增
+│   ├── tools/pdf-extractor.ts
+│   ├── sample-parser/
+│   │   ├── index.ts                     runSampleParser()
+│   │   └── prompts.ts
+│   └── regulation-parser/
+│       ├── index.ts                     runRegulationParser()
+│       └── prompts.ts
+├── lib/
+│   ├── llm.ts                           ← Phase 2 新增：OpenAI 封装
+│   ├── redis.ts
+│   └── req-params.ts
+├── queue/                               ← Phase 2 新增
+│   ├── ai-job.queue.ts
+│   └── worker.ts
+├── services/
+│   ├── ai-job.service.ts                ← Phase 2 新增
+│   └── ...（Phase 1 服务）
+├── routes/
+│   ├── ai.routes.ts                     ← 从 stub 升级为真实实现
+│   ├── samples.routes.ts                ← 新增 /parse 端点
+│   └── regulations.routes.ts            ← 新增 /parse 端点
+├── websocket/server.ts                  ← 完整重写
+└── main.ts                              ← 改用 httpServer + startWorker()
+
+apps/web/src/
+├── components/AIJobMonitor.tsx          ← Phase 2 新增
+├── hooks/useTaskSocket.ts               ← Phase 2 新增
+├── lib/
+│   ├── socket.ts                        ← Phase 2 新增
+│   ├── hooks.ts                         ← 新增 useAIJob / useParseRegulation / useParseSample
+│   └── api-types.ts                     ← 新增 AIJobView
+└── pages/
+    ├── RegulationListPage.tsx           ← 新增解析按钮 + AIJobMonitor
+    └── TaskDetailPage.tsx               ← useTaskSocket + 样本 AI 解析列
+
+packages/shared/src/types/
+├── ws-events.ts                         ← Phase 2 新增：WSEventMap 等
+└── index.ts                             ← re-export ws-events
+```
 
 ---
 
