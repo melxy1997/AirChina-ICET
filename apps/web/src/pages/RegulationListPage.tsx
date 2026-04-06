@@ -1,12 +1,15 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
+import AIJobMonitor from '@/components/AIJobMonitor';
 import { api } from '@/lib/api';
 import type { RegulationListItem } from '@/lib/api-types';
-import { useRegulations } from '@/lib/hooks';
+import { useParseRegulation, useRegulations } from '@/lib/hooks';
 
 export default function RegulationListPage() {
   const { data, isLoading, refetch } = useRegulations();
   const fileRef = useRef<HTMLInputElement>(null);
   const regulations = data?.data ?? [];
+  const parseRegulation = useParseRegulation();
+  const [activeJobMap, setActiveJobMap] = useState<Record<string, string>>({});
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -17,6 +20,11 @@ export default function RegulationListPage() {
     });
     if (fileRef.current) fileRef.current.value = '';
     refetch();
+  };
+
+  const handleParse = async (regulationId: string) => {
+    const result = await parseRegulation.mutateAsync(regulationId);
+    setActiveJobMap((prev) => ({ ...prev, [regulationId]: result.jobId }));
   };
 
   const parseStatusLabel: Record<string, string> = {
@@ -59,6 +67,7 @@ export default function RegulationListPage() {
                 <th className="px-4 py-3 text-center">控制点</th>
                 <th className="px-4 py-3 text-center">关联场景</th>
                 <th className="px-4 py-3 text-left">上传时间</th>
+                <th className="px-4 py-3 text-center">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -74,11 +83,45 @@ export default function RegulationListPage() {
                   <td className="px-4 py-3 text-gray-500">
                     {new Date(r.createdAt).toLocaleDateString('zh-CN')}
                   </td>
+                  <td className="px-4 py-3 text-center space-y-1">
+                    {r.parseStatus !== 'COMPLETED' && !activeJobMap[r.id] && (
+                      <button
+                        type="button"
+                        onClick={() => void handleParse(r.id)}
+                        disabled={parseRegulation.isPending}
+                        className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        解析
+                      </button>
+                    )}
+                    {activeJobMap[r.id] && (
+                      <div className="w-48">
+                        <AIJobMonitor
+                          jobId={activeJobMap[r.id]}
+                          onComplete={() => {
+                            setActiveJobMap((prev) => {
+                              const next = { ...prev };
+                              delete next[r.id];
+                              return next;
+                            });
+                            refetch();
+                          }}
+                          onFail={() => {
+                            setActiveJobMap((prev) => {
+                              const next = { ...prev };
+                              delete next[r.id];
+                              return next;
+                            });
+                          }}
+                        />
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
               {regulations.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                     暂无规章制度
                   </td>
                 </tr>

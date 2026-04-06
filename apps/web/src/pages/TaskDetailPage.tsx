@@ -2,6 +2,7 @@ import type { TaskStatus } from '@icet/shared';
 import { ALLOWED_TRANSITIONS, TASK_STATUS_LABELS } from '@icet/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import AIJobMonitor from '@/components/AIJobMonitor';
 import PlanTab from '@/components/PlanTab';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -13,6 +14,7 @@ import {
   useGeneratePaper,
   useOrgUsers,
   usePaper,
+  useParseSample,
   useSamples,
   useTask,
   useTransitionStatus,
@@ -876,6 +878,8 @@ function SampleMatrix({
   planSteps: PlanStepRow[];
 }) {
   const updateResult = useUpdateStepResult();
+  const parseSample = useParseSample();
+  const [activeJobMap, setActiveJobMap] = useState<Record<string, string>>({});
 
   const resultOptions = ['✓', '×', 'N/A', 'PENDING'];
   const resultColor: Record<string, string> = {
@@ -883,6 +887,11 @@ function SampleMatrix({
     '×': 'text-red-600',
     'N/A': 'text-gray-400',
     PENDING: 'text-yellow-500',
+  };
+
+  const handleParse = async (sampleId: string) => {
+    const result = await parseSample.mutateAsync({ taskId, sampleId });
+    setActiveJobMap((prev) => ({ ...prev, [sampleId]: result.jobId }));
   };
 
   const columns =
@@ -915,62 +924,102 @@ function SampleMatrix({
               </th>
             ))}
             <th className="px-3 py-2 text-left border">备注</th>
+            <th className="px-3 py-2 text-center border">AI 解析</th>
           </tr>
         </thead>
         <tbody className="divide-y">
-          {samples.map((s) => (
-            <tr key={s.id}>
-              <td className="px-3 py-2 border">{s.no}</td>
-              <td className="px-3 py-2 border max-w-xs align-top">
-                <div className="truncate text-sm" title={s.content || undefined}>
-                  {s.content?.trim() ? s.content : <span className="text-gray-400">（无文字说明）</span>}
-                </div>
-                {s.files && s.files.length > 0 && (
-                  <ul className="mt-1.5 space-y-0.5 text-xs">
-                    {s.files.map(({ fileRef }) => (
-                      <li key={fileRef.id} className="truncate">
-                        <button
-                          type="button"
-                          onClick={() => openFileDownload(fileRef.id)}
-                          className="text-left text-blue-600 hover:underline max-w-full truncate inline-block"
-                        >
-                          {fileRef.originalName}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </td>
-              {columns.map((step) => {
-                const ex = s.stepExecutions.find((e) => e.stepId === step.id);
-                const value = ex?.result ?? 'PENDING';
-                return (
-                  <td key={step.id} className="px-3 py-2 border text-center">
-                    <select
-                      value={value}
-                      onChange={(ev) =>
-                        updateResult.mutate({
-                          taskId,
-                          sampleId: s.id,
-                          stepId: step.id,
-                          result: ev.target.value,
-                        })
-                      }
-                      disabled={updateResult.isPending}
-                      className={`text-center font-bold max-w-full ${resultColor[value] || ''}`}
-                    >
-                      {resultOptions.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
+          {samples.map((s) => {
+            const hasPdf = s.files?.some(
+              (f) => f.fileRef.fileType === 'PDF' || f.fileRef.originalName?.endsWith('.pdf'),
+            );
+            return (
+              <tr key={s.id}>
+                <td className="px-3 py-2 border">{s.no}</td>
+                <td className="px-3 py-2 border max-w-xs align-top">
+                  <div className="truncate text-sm" title={s.content || undefined}>
+                    {s.content?.trim() ? s.content : <span className="text-gray-400">（无文字说明）</span>}
+                  </div>
+                  {s.files && s.files.length > 0 && (
+                    <ul className="mt-1.5 space-y-0.5 text-xs">
+                      {s.files.map(({ fileRef }) => (
+                        <li key={fileRef.id} className="truncate">
+                          <button
+                            type="button"
+                            onClick={() => openFileDownload(fileRef.id)}
+                            className="text-left text-blue-600 hover:underline max-w-full truncate inline-block"
+                          >
+                            {fileRef.originalName}
+                          </button>
+                        </li>
                       ))}
-                    </select>
-                  </td>
-                );
-              })}
-              <td className="px-3 py-2 border text-gray-500">{s.remark || '-'}</td>
-            </tr>
-          ))}
+                    </ul>
+                  )}
+                </td>
+                {columns.map((step) => {
+                  const ex = s.stepExecutions.find((e) => e.stepId === step.id);
+                  const value = ex?.result ?? 'PENDING';
+                  return (
+                    <td key={step.id} className="px-3 py-2 border text-center">
+                      <select
+                        value={value}
+                        onChange={(ev) =>
+                          updateResult.mutate({
+                            taskId,
+                            sampleId: s.id,
+                            stepId: step.id,
+                            result: ev.target.value,
+                          })
+                        }
+                        disabled={updateResult.isPending}
+                        className={`text-center font-bold max-w-full ${resultColor[value] || ''}`}
+                      >
+                        {resultOptions.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  );
+                })}
+                <td className="px-3 py-2 border text-gray-500">{s.remark || '-'}</td>
+                <td className="px-3 py-2 border text-center">
+                  {activeJobMap[s.id] ? (
+                    <div className="w-36">
+                      <AIJobMonitor
+                        jobId={activeJobMap[s.id]}
+                        onComplete={() =>
+                          setActiveJobMap((prev) => {
+                            const next = { ...prev };
+                            delete next[s.id];
+                            return next;
+                          })
+                        }
+                        onFail={() =>
+                          setActiveJobMap((prev) => {
+                            const next = { ...prev };
+                            delete next[s.id];
+                            return next;
+                          })
+                        }
+                      />
+                    </div>
+                  ) : hasPdf ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleParse(s.id)}
+                      disabled={parseSample.isPending}
+                      className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      AI 解析
+                    </button>
+                  ) : (
+                    <span className="text-xs text-gray-400">无 PDF</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

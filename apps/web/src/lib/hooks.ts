@@ -246,3 +246,25 @@ export function useAIJob(jobId: string | null | undefined) {
     },
   });
 }
+
+export function useParseRegulation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (regulationId: string) =>
+      api.post<{ jobId: string }>(`/regulations/${regulationId}/parse`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['regulations'] });
+    },
+  });
+}
+
+export function useParseSample() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, sampleId }: { taskId: string; sampleId: string }) =>
+      api.post<{ jobId: string }>(`/tasks/${taskId}/samples/${sampleId}/parse`),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.samples(variables.taskId) });
+    },
+  });
+}
