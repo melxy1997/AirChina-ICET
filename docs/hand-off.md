@@ -469,22 +469,84 @@ icet/
 | rollup 缺少 linux-arm64-gnu native module | pnpm hoisted 模式下 optional dependencies 平台检测异常 | 根 package.json 添加 `pnpm.supportedArchitectures` 配置 |
 | 新增 bcryptjs/jsonwebtoken 后需重新 pnpm install | Phase 1 新增了 4 个运行时/类型依赖 | **约定：依赖安装命令告诉用户执行，不在沙箱中自行操作** |
 
-#### 当前弱点与待改进项
+### ✅ Phase 1 补丁（已完成）
 
-> ⚠️ 以下是已知的架构弱点，需要在后续 Phase 中解决
+> 完成时间：2026-04-06
+> 分支：`feature/solo`
+> 新增提交：5 个
+> 前置条件：需执行 `pnpm install` 安装新增依赖后验证
+
+#### 完成内容
+
+| Commit | 说明 |
+|--------|------|
+| `feat(api): integrate MinIO S3 file storage for upload/download` | file.service.ts + files 路由真实实现 + regulations 路由接入 S3 |
+| `feat(web): migrate from useEffect+fetch to TanStack Query` | @tanstack/react-query + hooks.ts 集中管理 query keys |
+| `feat(web): add Toast notifications, ConfirmDialog, and global error handling` | ToastProvider + useConfirm + QueryErrorHandler |
+| `feat(web): add task creation page with scenario selector and sampling config` | TaskNewPage + /tasks/new 路由 |
+| `feat(api): add rate limiting and pagination parameter validation` | 内存级 rate limiter + 分页参数 clamp |
+
+#### 实现细节
+
+**后端 — MinIO/S3 文件存储**：
+- `src/services/file.service.ts` — S3Client 单例、ensureBucket() 启动时创建桶、uploadFile() 上传到 S3 + 创建 FileReference 记录、getDownloadUrl() 预签名 URL（1小时有效）、getFileStream() 直接下载流、deleteFile() 删除文件+记录
+- `src/routes/files.routes.ts` — POST /files/upload（multer memory → S3）、GET /files/:id（返回预签名 URL）、GET /files/:id/download（流式下载）、DELETE /files/:id
+- `src/routes/regulations.routes.ts` — 上传时先调用 fileService.uploadFile()，再创建 Regulation 记录
+- `src/services/regulation.service.ts` — createRegulation() 改为接受外部 fileRefId，不再内部创建 FileReference
+- `src/main.ts` — 启动时调用 ensureBucket()
+
+**后端 — Rate Limiting + 分页校验**：
+- `src/app.ts` — 内存级 rate limiter（100 req/min per user），响应头 X-RateLimit-Limit / X-RateLimit-Remaining；分页参数校验：page >= 1, pageSize 1-100
+
+**前端 — TanStack Query 迁移**：
+- `src/lib/hooks.ts` — 集中定义 queryKeys + 14 个 hooks（useScenarios/useCreateScenario/useTasks/useTransitionStatus/useSamples/useUpdateStepResult 等），所有 mutation onSuccess 自动 invalidateQueries
+- `src/main.tsx` — QueryClientProvider 包裹，staleTime 30s, retry 1, refetchOnWindowFocus false
+- 4 个页面全部从 useEffect+fetch 迁移到 hooks
+
+**前端 — UI 组件**：
+- `src/components/ui/toast.tsx` — ToastProvider + useToast，4 种样式（default/success/error/warning），4 秒自动消失
+- `src/components/ui/confirm-dialog.tsx` — ConfirmDialog + useConfirm hook（promise-based，支持 await）
+- `src/lib/query-error-handler.tsx` — TanStack Query 全局 mutation 错误处理器
+- `src/pages/TaskNewPage.tsx` — 底稿编号 + 测试单位 + 业务场景下拉选择 + 抽样方法/期间/来源
+
+#### 新增依赖
+
+| 包 | 版本 | 位置 |
+|----|------|------|
+| @aws-sdk/client-s3 | ^3.700.0 | apps/api |
+| @aws-sdk/s3-request-presigner | ^3.700.0 | apps/api |
+| @tanstack/react-query | ^5.62.0 | apps/web |
+
+#### 待验证项
+
+- [ ] `pnpm install` 安装新增依赖
+- [ ] `pnpm --filter @icet/api build` 后端编译通过
+- [ ] `pnpm --filter @icet/web build` 前端编译通过
+- [ ] `node apps/api/tests/api.test.mjs` 测试脚本全部通过（MinIO 相关测试需要 docker compose up）
+
+#### 当前弱点与改进记录
+
+> 以下问题在 Phase 1 补丁中已修复
+
+| 弱点 | 状态 | 修复方式 |
+|------|------|----------|
+| **orgId 硬编码为 'TODO'** | ✅ 已修复 | auth middleware 查 User.organizationId 挂载 req.orgId，所有路由统一使用 |
+| **MinIO 文件上传未实现** | ✅ 已修复 | 集成 @aws-sdk/client-s3，file.service.ts 封装 upload/download/delete，regulations 路由接入真实上传 |
+| **前端无全局错误处理** | ✅ 已修复 | Toast 组件 + QueryErrorHandler 自动展示 mutation 错误 |
+| **前端无 TanStack Query** | ✅ 已修复 | 迁移全部页面到 @tanstack/react-query，集中 query keys + hooks |
+| **无新建任务页面** | ✅ 已修复 | TaskNewPage：底稿编号 + 测试单位 + 场景选择 + 抽样配置 |
+| **API 无分页参数校验** | ✅ 已修复 | app.ts 中间件 clamp page>=1, pageSize 1-100 |
+| **无请求速率限制** | ✅ 已修复 | 内存级 rate limiter 100 req/min，响应头 X-RateLimit-* |
+
+> 以下问题尚未修复
 
 | 弱点 | 说明 | 计划解决时机 |
 |------|------|------------|
-| **orgId 硬编码为 'TODO'** | 所有 Service 中 `organizationId` 暂时写死为 'TODO'，因为 auth middleware 只提取了 userId，未查组织关系 | Phase 1 补丁：auth middleware 中查 User.organizationId 并挂到 req 上 |
-| **MinIO 文件上传未实现** | regulation 上传路由中 `storagePath` 只是拼接了路径，未真正上传到 MinIO | Phase 1 补丁或 Phase 2：集成 @aws-sdk/client-s3 |
-| **前端无全局错误处理** | API 请求失败只 console.error，无 toast/通知 | 引入 shadcn/ui 的 toast 组件 |
 | **前端无 loading 骨架屏** | 数据加载只显示"加载中..."文字 | 引入骨架屏组件 |
-| **无 TanStack Query** | 当前直接在组件中 useEffect + fetch，无缓存/重试/失效机制 | 迁移到 TanStack Query |
-| **无 Zustand 状态管理** | 当前只用 React Context (auth)，复杂状态（如任务筛选条件）未持久化 | 按需引入 Zustand store |
+| **无 Zustand 状态管理** | 复杂状态（如任务筛选条件）未持久化 | 按需引入 Zustand store |
 | **seed 脚本未用 tsx 执行** | prisma/seed.ts 使用了 ESM import 但 prisma seed 命令可能需要额外配置 | 在 package.json 中配置 prisma.seed 或直接用 tsx 执行 |
-| **路由缺少新建任务页面** | TaskListPage 有"新建任务"按钮但 /tasks/new 路由未实现 | Phase 1 补丁 |
-| **API 无分页参数校验** | page/pageSize 直接 Number() 转换，无上下限校验 | 添加 Zod 校验中间件 |
-| **无请求速率限制** | API 无 rate limiting，生产环境存在安全风险 | 引入 express-rate-limit |
+| **rate limiting 基于内存** | 多实例部署时无法共享计数 | 迁移到 Redis-based rate limiter |
+| **前端无 shadcn/ui 完整组件库** | 当前只有手写 Toast 和 ConfirmDialog | 按需引入 shadcn/ui 组件 |
 
 #### 当前项目结构（Phase 1 后）
 
