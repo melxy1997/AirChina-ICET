@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { createApp } from './app.js';
 import { ensureBucket } from './services/file.service.js';
+import { startWorker } from './queue/worker.js';
 
 const PORT = process.env.PORT ?? 3000;
 
@@ -12,4 +13,8 @@ app.listen(PORT, async () => {
 
   // 确保文件存储桶存在
   await ensureBucket();
+
+  // 启动 AI 任务 Worker
+  startWorker();
+  console.log('[ICET API] AI job worker started');
 });
