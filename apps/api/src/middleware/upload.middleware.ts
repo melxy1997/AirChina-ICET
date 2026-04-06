@@ -1,6 +1,6 @@
-import multer from 'multer';
-import path from 'node:path';
 import crypto from 'node:crypto';
+import path from 'node:path';
+import multer from 'multer';
 
 /** 内存存储配置（小文件） */
 const memoryStorage = multer.memoryStorage();
@@ -23,7 +23,11 @@ const limits = {
 };
 
 /** 允许的文件类型 */
-const fileFilter = (_req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (
+  _req: Express.Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback,
+) => {
   const allowedMimes = [
     'application/pdf',
     'image/png',

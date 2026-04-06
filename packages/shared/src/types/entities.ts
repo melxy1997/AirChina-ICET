@@ -1,4 +1,15 @@
-import type { ID, Timestamp, TaskStatus, AIJobStatus, FileType, SamplingMethod, StepCheckType, AIJobType, AgentType, StepResultValue } from './base';
+import type {
+  AgentType,
+  AIJobStatus,
+  AIJobType,
+  FileType,
+  ID,
+  SamplingMethod,
+  StepCheckType,
+  StepResultValue,
+  TaskStatus,
+  Timestamp,
+} from './base';
 
 // ── §1 组织与用户 ──
 export interface Organization {

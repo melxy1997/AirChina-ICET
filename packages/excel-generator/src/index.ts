@@ -67,7 +67,7 @@ function buildWorkingPaperSheet(data: WorkingPaper): XLSX.WorkSheet {
   rowIdx += 4;
 
   // §7 测试步骤 + 样本矩阵
-  const stepHeaders = ['样本序号', '样本内容', ...data.steps.map(s => `步骤${s.index}`), '备注'];
+  const stepHeaders = ['样本序号', '样本内容', ...data.steps.map((s) => `步骤${s.index}`), '备注'];
   rows.push(stepHeaders);
   rowIdx++;
 
@@ -86,16 +86,14 @@ function buildWorkingPaperSheet(data: WorkingPaper): XLSX.WorkSheet {
 
   // 设置列宽
   ws['!cols'] = [
-    { wch: 10 },  // 样本序号
-    { wch: 30 },  // 样本内容
-    ...data.steps.map(() => ({ wch: 20 })),  // 步骤列
-    { wch: 20 },  // 备注
+    { wch: 10 }, // 样本序号
+    { wch: 30 }, // 样本内容
+    ...data.steps.map(() => ({ wch: 20 })), // 步骤列
+    { wch: 20 }, // 备注
   ];
 
   // 合并单元格 — 标题行
-  ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: stepHeaders.length - 1 } },
-  ];
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: stepHeaders.length - 1 } }];
 
   return ws;
 }
@@ -118,13 +116,7 @@ function buildAnomalySheet(data: WorkingPaper): XLSX.WorkSheet {
   }
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [
-    { wch: 10 },
-    { wch: 40 },
-    { wch: 10 },
-    { wch: 10 },
-    { wch: 30 },
-  ];
+  ws['!cols'] = [{ wch: 10 }, { wch: 40 }, { wch: 10 }, { wch: 10 }, { wch: 30 }];
 
   return ws;
 }
@@ -144,13 +136,8 @@ function buildLegendSheet(): XLSX.WorkSheet {
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [
-    { wch: 10 },
-    { wch: 50 },
-  ];
-  ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },
-  ];
+  ws['!cols'] = [{ wch: 10 }, { wch: 50 }];
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }];
 
   return ws;
 }

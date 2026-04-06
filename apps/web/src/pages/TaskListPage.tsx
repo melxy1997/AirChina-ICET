@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import type { TaskStatus } from '@icet/shared';
+import { TASK_STATUS_LABELS } from '@icet/shared';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '@/lib/api';
-import { TASK_STATUS_LABELS } from '@icet/shared';
-import type { TaskStatus } from '@icet/shared';
 
 interface TaskItem {
   id: string;
@@ -29,9 +29,13 @@ export default function TaskListPage() {
     setLoading(true);
     const params = new URLSearchParams();
     if (statusFilter) params.set('status', statusFilter);
-    api.get<{ data: TaskItem[] }>(`/tasks?${params}`).then((res) => {
-      setTasks(res.data);
-    }).catch(console.error).finally(() => setLoading(false));
+    api
+      .get<{ data: TaskItem[] }>(`/tasks?${params}`)
+      .then((res) => {
+        setTasks(res.data);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, [statusFilter]);
 
   const statusColor: Record<string, string> = {
@@ -50,7 +54,10 @@ export default function TaskListPage() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">测试任务</h2>
-        <button onClick={() => navigate('/tasks/new')} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        <button
+          onClick={() => navigate('/tasks/new')}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
           新建任务
         </button>
       </div>
@@ -92,22 +99,42 @@ export default function TaskListPage() {
             </thead>
             <tbody className="divide-y">
               {tasks.map((t) => (
-                <tr key={t.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/tasks/${t.id}`)}>
+                <tr
+                  key={t.id}
+                  className="hover:bg-gray-50 cursor-pointer"
+                  onClick={() => navigate(`/tasks/${t.id}`)}
+                >
                   <td className="px-4 py-3 font-medium">{t.paperId}</td>
                   <td className="px-4 py-3">{t.unitName}</td>
-                  <td className="px-4 py-3 text-gray-500">{t.scenario.processLevel1} / {t.scenario.processLevel2}</td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {t.scenario.processLevel1} / {t.scenario.processLevel2}
+                  </td>
                   <td className="px-4 py-3">{t.tester.name}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${statusColor[t.status] || 'bg-gray-100'}`}>
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-medium ${statusColor[t.status] || 'bg-gray-100'}`}
+                    >
                       {TASK_STATUS_LABELS[t.status as TaskStatus] || t.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center">{t._count.anomalies > 0 ? <span className="text-red-500 font-bold">{t._count.anomalies}</span> : '-'}</td>
-                  <td className="px-4 py-3 text-gray-500">{new Date(t.createdAt).toLocaleDateString('zh-CN')}</td>
+                  <td className="px-4 py-3 text-center">
+                    {t._count.anomalies > 0 ? (
+                      <span className="text-red-500 font-bold">{t._count.anomalies}</span>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {new Date(t.createdAt).toLocaleDateString('zh-CN')}
+                  </td>
                 </tr>
               ))}
               {tasks.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">暂无测试任务</td></tr>
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                    暂无测试任务
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

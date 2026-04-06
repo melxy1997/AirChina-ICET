@@ -1,5 +1,5 @@
-import type { StepResultValue, StepCheckType } from './base';
-import type { PageLocation, SampleParsedContent } from './entities';
+import type { StepResultValue } from './base';
+import type { SampleParsedContent } from './entities';
 
 // ── TestExecutor Agent 状态 ──
 export interface ExecutorState {

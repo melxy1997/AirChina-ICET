@@ -1,10 +1,16 @@
+import type { TaskStatus } from '@icet/shared';
+import { isTransitionAllowed } from '@icet/shared';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../db/prisma.js';
 import { AppError } from '../middleware/error.middleware.js';
-import { isTransitionAllowed } from '@icet/shared';
-import type { TaskStatus } from '@icet/shared';
 
-export async function listTasks(orgId: string, page = 1, pageSize = 20, filters?: { status?: string; testerId?: string }) {
-  const where: any = { organizationId: orgId };
+export async function listTasks(
+  orgId: string,
+  page = 1,
+  pageSize = 20,
+  filters?: { status?: string; testerId?: string },
+) {
+  const where: Prisma.TestTaskWhereInput = { organizationId: orgId };
   if (filters?.status) where.status = filters.status;
   if (filters?.testerId) where.testerId = filters.testerId;
 
@@ -34,7 +40,14 @@ export async function getTask(id: string, orgId: string) {
       tester: { select: { id: true, name: true, email: true } },
       reviewer: { select: { id: true, name: true, email: true } },
       plan: { include: { steps: { orderBy: { index: 'asc' } } } },
-      sampleSet: { include: { samples: { include: { stepExecutions: true, files: { include: { fileRef: true } } }, orderBy: { no: 'asc' } } } },
+      sampleSet: {
+        include: {
+          samples: {
+            include: { stepExecutions: true, files: { include: { fileRef: true } } },
+            orderBy: { no: 'asc' },
+          },
+        },
+      },
       workingPaper: true,
       statusHistory: { orderBy: { changedAt: 'desc' } },
       anomalies: { orderBy: { createdAt: 'desc' } },
@@ -92,20 +105,30 @@ export async function createTask(data: {
   });
 }
 
-export async function updateTask(id: string, orgId: string, data: {
-  paperId?: string;
-  completionDate?: string;
-  reviewerId?: string;
-  samplingMethod?: string;
-  samplingPeriod?: string;
-  samplingSource?: string;
-}) {
+export async function updateTask(
+  id: string,
+  orgId: string,
+  data: {
+    paperId?: string;
+    completionDate?: string;
+    reviewerId?: string;
+    samplingMethod?: string;
+    samplingPeriod?: string;
+    samplingSource?: string;
+  },
+) {
   const task = await prisma.testTask.findFirst({ where: { id, organizationId: orgId } });
   if (!task) throw new AppError(404, '测试任务不存在');
   return prisma.testTask.update({ where: { id }, data });
 }
 
-export async function transitionStatus(id: string, orgId: string, newStatus: TaskStatus, changedBy: string, comment?: string) {
+export async function transitionStatus(
+  id: string,
+  orgId: string,
+  newStatus: TaskStatus,
+  changedBy: string,
+  comment?: string,
+) {
   const task = await prisma.testTask.findFirst({ where: { id, organizationId: orgId } });
   if (!task) throw new AppError(404, '测试任务不存在');
 

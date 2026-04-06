@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 
@@ -17,7 +17,13 @@ export default function ScenarioListPage() {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ processLevel1: '', processLevel2: '', processLevel3: '', name: '', description: '' });
+  const [form, setForm] = useState({
+    processLevel1: '',
+    processLevel2: '',
+    processLevel3: '',
+    name: '',
+    description: '',
+  });
   const navigate = useNavigate();
 
   const fetchScenarios = async () => {
@@ -31,7 +37,9 @@ export default function ScenarioListPage() {
     }
   };
 
-  useEffect(() => { fetchScenarios(); }, []);
+  useEffect(() => {
+    fetchScenarios();
+  }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,19 +55,58 @@ export default function ScenarioListPage() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">业务场景管理</h2>
-        <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
           {showForm ? '取消' : '新建场景'}
         </button>
       </div>
 
       {showForm && (
-        <form onSubmit={handleCreate} className="bg-white p-4 rounded-lg shadow mb-4 grid grid-cols-2 gap-3">
-          <input placeholder="一级流程" value={form.processLevel1} onChange={(e) => setForm({ ...form, processLevel1: e.target.value })} className="border rounded px-3 py-2" required />
-          <input placeholder="二级流程" value={form.processLevel2} onChange={(e) => setForm({ ...form, processLevel2: e.target.value })} className="border rounded px-3 py-2" required />
-          <input placeholder="三级流程（可选）" value={form.processLevel3} onChange={(e) => setForm({ ...form, processLevel3: e.target.value })} className="border rounded px-3 py-2" />
-          <input placeholder="场景名称" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="border rounded px-3 py-2" required />
-          <input placeholder="描述（可选）" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="border rounded px-3 py-2 col-span-2" />
-          <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">创建</button>
+        <form
+          onSubmit={handleCreate}
+          className="bg-white p-4 rounded-lg shadow mb-4 grid grid-cols-2 gap-3"
+        >
+          <input
+            placeholder="一级流程"
+            value={form.processLevel1}
+            onChange={(e) => setForm({ ...form, processLevel1: e.target.value })}
+            className="border rounded px-3 py-2"
+            required
+          />
+          <input
+            placeholder="二级流程"
+            value={form.processLevel2}
+            onChange={(e) => setForm({ ...form, processLevel2: e.target.value })}
+            className="border rounded px-3 py-2"
+            required
+          />
+          <input
+            placeholder="三级流程（可选）"
+            value={form.processLevel3}
+            onChange={(e) => setForm({ ...form, processLevel3: e.target.value })}
+            className="border rounded px-3 py-2"
+          />
+          <input
+            placeholder="场景名称"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="border rounded px-3 py-2"
+            required
+          />
+          <input
+            placeholder="描述（可选）"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            className="border rounded px-3 py-2 col-span-2"
+          />
+          <button
+            type="submit"
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          >
+            创建
+          </button>
         </form>
       )}
 
@@ -77,17 +124,27 @@ export default function ScenarioListPage() {
           </thead>
           <tbody className="divide-y">
             {scenarios.map((s) => (
-              <tr key={s.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/scenarios/${s.id}`)}>
+              <tr
+                key={s.id}
+                className="hover:bg-gray-50 cursor-pointer"
+                onClick={() => navigate(`/scenarios/${s.id}`)}
+              >
                 <td className="px-4 py-3 font-medium">{s.name}</td>
                 <td className="px-4 py-3">{s.processLevel1}</td>
                 <td className="px-4 py-3">{s.processLevel2}</td>
                 <td className="px-4 py-3 text-center">{s._count.regulations}</td>
                 <td className="px-4 py-3 text-center">{s._count.tasks}</td>
-                <td className="px-4 py-3 text-gray-500">{new Date(s.createdAt).toLocaleDateString('zh-CN')}</td>
+                <td className="px-4 py-3 text-gray-500">
+                  {new Date(s.createdAt).toLocaleDateString('zh-CN')}
+                </td>
               </tr>
             ))}
             {scenarios.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">暂无业务场景</td></tr>
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                  暂无业务场景
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

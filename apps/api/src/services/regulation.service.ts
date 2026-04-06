@@ -1,6 +1,6 @@
+import crypto from 'node:crypto';
 import { prisma } from '../db/prisma.js';
 import { AppError } from '../middleware/error.middleware.js';
-import crypto from 'node:crypto';
 
 export async function listRegulations(orgId: string, page = 1, pageSize = 20) {
   const where = { organizationId: orgId };
@@ -26,7 +26,7 @@ export async function getRegulation(id: string, orgId: string) {
     include: {
       fileRef: true,
       controlPoints: { orderBy: { controlId: 'asc' } },
-      scenarios: { include: { scenario: { select: { id: true, name: true } } } },
+      scenarios: { select: { id: true, name: true } },
     },
   });
   if (!regulation) throw new AppError(404, '规章制度不存在');

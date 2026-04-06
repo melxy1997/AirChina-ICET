@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, type ReactNode, useContext, useEffect, useState } from 'react';
 import { api } from './api';
 
 interface AuthUser {
@@ -26,17 +26,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (token) {
-      api.get<AuthUser>('/auth/me').then(setUser).catch(() => {
-        localStorage.removeItem('token');
-        setToken(null);
-      }).finally(() => setLoading(false));
+      api
+        .get<AuthUser>('/auth/me')
+        .then(setUser)
+        .catch(() => {
+          localStorage.removeItem('token');
+          setToken(null);
+        })
+        .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
   }, [token]);
 
   const login = async (email: string, password: string) => {
-    const res = await api.post<{ user: AuthUser; token: string }>('/auth/login', { email, password });
+    const res = await api.post<{ user: AuthUser; token: string }>('/auth/login', {
+      email,
+      password,
+    });
     localStorage.setItem('token', res.token);
     setToken(res.token);
     setUser(res.user);

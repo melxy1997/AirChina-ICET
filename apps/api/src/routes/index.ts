@@ -1,12 +1,12 @@
 import { Router } from 'express';
+import { aiRoutes } from './ai.routes.js';
 import { authRoutes } from './auth.routes.js';
+import { fileRoutes } from './files.routes.js';
+import { paperRoutes } from './papers.routes.js';
+import { regulationRoutes } from './regulations.routes.js';
+import { sampleRoutes } from './samples.routes.js';
 import { scenarioRoutes } from './scenarios.routes.js';
 import { taskRoutes } from './tasks.routes.js';
-import { sampleRoutes } from './samples.routes.js';
-import { regulationRoutes } from './regulations.routes.js';
-import { paperRoutes } from './papers.routes.js';
-import { fileRoutes } from './files.routes.js';
-import { aiRoutes } from './ai.routes.js';
 
 export const routes = Router();
 

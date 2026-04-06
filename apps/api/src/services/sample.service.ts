@@ -16,7 +16,9 @@ export async function listSamples(taskId: string) {
       samples: {
         include: {
           stepExecutions: { orderBy: { executedAt: 'asc' } },
-          files: { include: { fileRef: { select: { id: true, originalName: true, fileType: true } } } },
+          files: {
+            include: { fileRef: { select: { id: true, originalName: true, fileType: true } } },
+          },
         },
         orderBy: { no: 'asc' },
       },
@@ -26,13 +28,16 @@ export async function listSamples(taskId: string) {
   return { sampleSetId: set.id, samples: set.samples };
 }
 
-export async function addSample(taskId: string, data: {
-  no: number;
-  content: string;
-  fileIds?: string[];
-  remark?: string;
-  addedBy: string;
-}) {
+export async function addSample(
+  taskId: string,
+  data: {
+    no: number;
+    content: string;
+    fileIds?: string[];
+    remark?: string;
+    addedBy: string;
+  },
+) {
   const set = await getOrCreateSampleSet(taskId);
 
   return prisma.sample.create({

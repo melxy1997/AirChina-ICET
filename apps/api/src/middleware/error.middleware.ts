@@ -1,4 +1,4 @@
-import type { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 
 export class AppError extends Error {
   constructor(
@@ -19,12 +19,7 @@ export function asyncHandler(
   };
 }
 
-export function errorHandler(
-  err: Error,
-  _req: Request,
-  res: Response,
-  _next: NextFunction,
-): void {
+export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
       error: {
@@ -41,9 +36,7 @@ export function errorHandler(
   res.status(500).json({
     error: {
       name: 'InternalServerError',
-      message: process.env.NODE_ENV === 'production'
-        ? 'Internal server error'
-        : err.message,
+      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
     },
   });
 }

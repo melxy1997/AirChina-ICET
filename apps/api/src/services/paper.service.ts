@@ -1,13 +1,22 @@
+import { buildWorkbook } from '@icet/excel-generator';
+import type {
+  SamplingMethod,
+  StepResultValue,
+  WorkingPaper as WorkingPaperType,
+} from '@icet/shared';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../db/prisma.js';
 import { AppError } from '../middleware/error.middleware.js';
-import { buildWorkbook } from '@icet/excel-generator';
-import type { WorkingPaper as WorkingPaperType } from '@icet/shared';
 
-export async function generatePaper(taskId: string, orgId: string, overrides?: {
-  controlDescription?: string;
-  testResult?: { controlIds: string; result: string };
-  completionDate?: string;
-}) {
+export async function generatePaper(
+  taskId: string,
+  orgId: string,
+  overrides?: {
+    controlDescription?: string;
+    testResult?: { controlIds: string; result: string };
+    completionDate?: string;
+  },
+) {
   const task = await prisma.testTask.findFirst({
     where: { id: taskId, organizationId: orgId },
     include: {
@@ -15,7 +24,9 @@ export async function generatePaper(taskId: string, orgId: string, overrides?: {
       tester: { select: { name: true } },
       reviewer: { select: { name: true } },
       plan: { include: { steps: { orderBy: { index: 'asc' } } } },
-      sampleSet: { include: { samples: { include: { stepExecutions: true }, orderBy: { no: 'asc' } } } },
+      sampleSet: {
+        include: { samples: { include: { stepExecutions: true }, orderBy: { no: 'asc' } } },
+      },
       anomalies: { where: { status: { not: 'RESOLVED' } } },
       taskRegulations: { include: { regulation: true } },
     },
@@ -37,9 +48,10 @@ export async function generatePaper(taskId: string, orgId: string, overrides?: {
     paperId: task.paperId,
     testerName: task.tester.name,
     reviewerName: task.reviewer?.name ?? '',
-    completionDate: overrides?.completionDate ?? task.completionDate ?? new Date().toISOString().slice(0, 10),
+    completionDate:
+      overrides?.completionDate ?? task.completionDate ?? new Date().toISOString().slice(0, 10),
     sampling: {
-      method: task.samplingMethod as any,
+      method: task.samplingMethod as SamplingMethod,
       period: task.samplingPeriod,
       sampleCount: samples.length,
       sampleSource: task.samplingSource,
@@ -52,7 +64,7 @@ export async function generatePaper(taskId: string, orgId: string, overrides?: {
       content: s.content,
       stepResults: steps.map((step) => {
         const exec = s.stepExecutions.find((e) => e.stepId === step.id);
-        return (exec?.result ?? 'PENDING') as any;
+        return (exec?.result ?? 'PENDING') as StepResultValue;
       }),
       remark: s.remark ?? undefined,
     })),
@@ -72,14 +84,18 @@ export async function generatePaper(taskId: string, orgId: string, overrides?: {
   // Upsert working paper
   const paper = await prisma.workingPaper.upsert({
     where: { taskId },
-    create: { taskId, snapshotData: snapshot as any, status: 'DRAFT' },
-    update: { snapshotData: snapshot as any },
+    create: {
+      taskId,
+      snapshotData: snapshot as unknown as Prisma.InputJsonValue,
+      status: 'DRAFT',
+    },
+    update: { snapshotData: snapshot as unknown as Prisma.InputJsonValue },
   });
 
   return paper;
 }
 
-export async function exportPaperExcel(paperId: string, orgId: string): Promise<Buffer> {
+export async function exportPaperExcel(paperId: string, _orgId: string): Promise<Buffer> {
   const paper = await prisma.workingPaper.findFirst({
     where: { id: paperId },
   });

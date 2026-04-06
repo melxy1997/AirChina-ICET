@@ -301,15 +301,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
 // ============================================================
 //  STATE
 // ============================================================
-let steps = [
+const steps = [
   '查看机供品年度预算编制是否依据当年机供品成本水平制定。',
   '查看预算编制是否经过客舱服务部总经理审批签字后报规划财务部。',
   '查看是否根据中期预算调整要求编制年中预算调整申请。'
 ];
-let samples = [
+const samples = [
   { no: 1, content: '2025年机供品采购计划', stepResults: ['✓','✓','N/A'], remark: '' }
 ];
-let anomalies = [];
+const anomalies = [];
 
 // ============================================================
 //  UTILS
@@ -748,7 +748,7 @@ function buildSheet(d){
     sc(R,1,s.content,{align:'left'});
     (s.stepResults||[]).forEach((res,ti)=>{
       // 根据结果设置不同底色
-      let bg=undefined;
+      let bg;
       if(res==='✓')bg=BG.LEGEND_PASS;
       else if(res==='×')bg=BG.LEGEND_FAIL;
       else if(res==='N/A')bg=BG.LEGEND_NA;

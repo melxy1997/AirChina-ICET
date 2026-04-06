@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { asyncHandler } from '../middleware/error.middleware.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
+import { asyncHandler } from '../middleware/error.middleware.js';
 import * as authService from '../services/auth.service.js';
 
 export const authRoutes = Router();
@@ -20,22 +20,32 @@ const loginSchema = z.object({
 });
 
 /** POST /auth/register */
-authRoutes.post('/register', asyncHandler(async (req, res) => {
-  const data = registerSchema.parse(req.body);
-  const result = await authService.register(data);
-  res.status(201).json(result);
-}));
+authRoutes.post(
+  '/register',
+  asyncHandler(async (req, res) => {
+    const data = registerSchema.parse(req.body);
+    const result = await authService.register(data);
+    res.status(201).json(result);
+  }),
+);
 
 /** POST /auth/login */
-authRoutes.post('/login', asyncHandler(async (req, res) => {
-  const data = loginSchema.parse(req.body);
-  const result = await authService.login(data.email, data.password);
-  res.json(result);
-}));
+authRoutes.post(
+  '/login',
+  asyncHandler(async (req, res) => {
+    const data = loginSchema.parse(req.body);
+    const result = await authService.login(data.email, data.password);
+    res.json(result);
+  }),
+);
 
 /** GET /auth/me — 需要认证 */
-authRoutes.get('/me', requireAuth, asyncHandler(async (req, res) => {
-  const userId = (req as any).userId;
-  const user = await authService.me(userId);
-  res.json(user);
-}));
+authRoutes.get(
+  '/me',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = req.userId!;
+    const user = await authService.me(userId);
+    res.json(user);
+  }),
+);

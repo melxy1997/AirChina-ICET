@@ -1,6 +1,6 @@
+import { isValidStepResult } from '@icet/shared';
 import { prisma } from '../db/prisma.js';
 import { AppError } from '../middleware/error.middleware.js';
-import { isValidStepResult } from '@icet/shared';
 
 export async function updateStepResult(data: {
   sampleId: string;
@@ -35,13 +35,15 @@ export async function updateStepResult(data: {
   });
 }
 
-export async function batchUpdateResults(items: {
-  sampleId: string;
-  stepId: string;
-  result: string;
-  executedBy: string;
-  humanNote?: string;
-}[]) {
+export async function batchUpdateResults(
+  items: {
+    sampleId: string;
+    stepId: string;
+    result: string;
+    executedBy: string;
+    humanNote?: string;
+  }[],
+) {
   const results = await Promise.all(items.map((item) => updateStepResult(item)));
   return { updated: results.length };
 }

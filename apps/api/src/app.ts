@@ -1,5 +1,5 @@
-import express from 'express';
 import cors from 'cors';
+import express from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { errorHandler } from './middleware/error.middleware.js';
@@ -11,10 +11,12 @@ export function createApp() {
 
   // 安全中间件
   app.use(helmet());
-  app.use(cors({
-    origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
-    credentials: true,
-  }));
+  app.use(
+    cors({
+      origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+      credentials: true,
+    }),
+  );
 
   // 请求日志
   app.use(morgan('dev'));

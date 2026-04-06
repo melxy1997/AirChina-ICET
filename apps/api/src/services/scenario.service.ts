@@ -20,7 +20,9 @@ export async function getScenario(id: string, orgId: string) {
   const scenario = await prisma.businessScenario.findFirst({
     where: { id, organizationId: orgId },
     include: {
-      regulations: { include: { regulation: { select: { id: true, title: true, version: true, parseStatus: true } } } },
+      regulations: {
+        select: { id: true, title: true, version: true, parseStatus: true },
+      },
       _count: { select: { tasks: true } },
     },
   });
@@ -40,21 +42,29 @@ export async function createScenario(data: {
   return prisma.businessScenario.create({ data });
 }
 
-export async function updateScenario(id: string, orgId: string, data: {
-  processLevel1?: string;
-  processLevel2?: string;
-  processLevel3?: string;
-  name?: string;
-  description?: string;
-  isActive?: boolean;
-}) {
-  const scenario = await prisma.businessScenario.findFirst({ where: { id, organizationId: orgId } });
+export async function updateScenario(
+  id: string,
+  orgId: string,
+  data: {
+    processLevel1?: string;
+    processLevel2?: string;
+    processLevel3?: string;
+    name?: string;
+    description?: string;
+    isActive?: boolean;
+  },
+) {
+  const scenario = await prisma.businessScenario.findFirst({
+    where: { id, organizationId: orgId },
+  });
   if (!scenario) throw new AppError(404, '业务场景不存在');
   return prisma.businessScenario.update({ where: { id }, data });
 }
 
 export async function deleteScenario(id: string, orgId: string) {
-  const scenario = await prisma.businessScenario.findFirst({ where: { id, organizationId: orgId } });
+  const scenario = await prisma.businessScenario.findFirst({
+    where: { id, organizationId: orgId },
+  });
   if (!scenario) throw new AppError(404, '业务场景不存在');
   return prisma.businessScenario.update({ where: { id }, data: { isActive: false } });
 }

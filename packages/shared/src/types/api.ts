@@ -1,4 +1,4 @@
-import type { ID, StepResultValue, SamplingMethod } from './base';
+import type { ID, StepResultValue } from './base';
 import type { SamplingConfig } from './entities';
 
 // ── 分页通用 ──

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 
 interface Regulation {
@@ -27,7 +27,9 @@ export default function RegulationListPage() {
     }
   };
 
-  useEffect(() => { fetchList(); }, []);
+  useEffect(() => {
+    fetchList();
+  }, []);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -55,7 +57,13 @@ export default function RegulationListPage() {
         <h2 className="text-xl font-bold">规章制度库</h2>
         <label className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 cursor-pointer">
           上传规章制度
-          <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={handleUpload} />
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".pdf"
+            className="hidden"
+            onChange={handleUpload}
+          />
         </label>
       </div>
 
@@ -76,14 +84,22 @@ export default function RegulationListPage() {
               <tr key={r.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium">{r.title}</td>
                 <td className="px-4 py-3">{r.version}</td>
-                <td className="px-4 py-3 text-center">{parseStatusLabel[r.parseStatus] || r.parseStatus}</td>
+                <td className="px-4 py-3 text-center">
+                  {parseStatusLabel[r.parseStatus] || r.parseStatus}
+                </td>
                 <td className="px-4 py-3 text-center">{r._count.controlPoints}</td>
                 <td className="px-4 py-3 text-center">{r._count.scenarios}</td>
-                <td className="px-4 py-3 text-gray-500">{new Date(r.createdAt).toLocaleDateString('zh-CN')}</td>
+                <td className="px-4 py-3 text-gray-500">
+                  {new Date(r.createdAt).toLocaleDateString('zh-CN')}
+                </td>
               </tr>
             ))}
             {regulations.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">暂无规章制度</td></tr>
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                  暂无规章制度
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

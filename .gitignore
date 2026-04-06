@@ -5,6 +5,10 @@ node_modules/
 # Build outputs
 dist/
 .turbo/
+.biome/
+
+# TypeScript incremental
+*.tsbuildinfo
 
 # Environment
 .env

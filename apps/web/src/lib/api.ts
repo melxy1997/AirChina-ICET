@@ -4,10 +4,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = localStorage.getItem('token');
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(init?.headers as Record<string, string> ?? {}),
+    ...((init?.headers as Record<string, string>) ?? {}),
   };
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers.Authorization = `Bearer ${token}`;
   }
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
   if (!res.ok) {
@@ -15,7 +15,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(body.error?.message || `请求失败: ${res.status}`);
   }
   // 文件下载
-  if (res.headers.get('content-type')?.includes('octet-stream') || res.headers.get('content-type')?.includes('spreadsheetml')) {
+  if (
+    res.headers.get('content-type')?.includes('octet-stream') ||
+    res.headers.get('content-type')?.includes('spreadsheetml')
+  ) {
     return res.blob() as unknown as T;
   }
   return res.json();
@@ -23,16 +26,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
-  put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
-  patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
+  post: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
+  put: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
+  patch: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
   del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
   upload: <T>(path: string, file: File, formData?: Record<string, string>) => {
     const token = localStorage.getItem('token');
     const fd = new FormData();
     fd.append('file', file);
     if (formData) {
-      Object.entries(formData).forEach(([k, v]) => fd.append(k, v));
+      for (const [k, v] of Object.entries(formData)) {
+        fd.append(k, v);
+      }
     }
     return request<T>(path, {
       method: 'POST',

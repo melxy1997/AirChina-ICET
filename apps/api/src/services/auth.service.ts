@@ -1,8 +1,7 @@
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { type SignOptions } from 'jsonwebtoken';
 import { prisma } from '../db/prisma.js';
 import { AppError } from '../middleware/error.middleware.js';
-import type { ID } from '@icet/shared';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
@@ -40,7 +39,7 @@ export async function register(data: {
       email: data.email,
       passwordHash,
       organizationId: data.organizationId,
-      role: (data.role as any) || 'TESTER',
+      role: data.role ?? 'TESTER',
       isActive: true,
     },
   });
@@ -110,5 +109,7 @@ export function verifyToken(token: string): TokenPayload {
 }
 
 function signToken(payload: TokenPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign(payload, JWT_SECRET, {
+    expiresIn: JWT_EXPIRES_IN as SignOptions['expiresIn'],
+  });
 }
