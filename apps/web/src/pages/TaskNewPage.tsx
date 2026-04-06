@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCreateTask, useScenarios } from '@/lib/hooks';
-import { useAuth } from '@/lib/auth';
 import { useToast } from '@/components/ui/toast';
+import { useAuth } from '@/lib/auth';
+import { useCreateTask, useScenarios } from '@/lib/hooks';
 
 const samplingMethods = ['随机抽样', '系统抽样', '判断抽样', '全量检查'];
 
@@ -32,7 +32,7 @@ export default function TaskNewPage() {
       const task = await createTask.mutateAsync(form);
       toast('任务创建成功', 'success');
       navigate(`/tasks/${task.id}`);
-    } catch (err: any) {
+    } catch {
       // Error already handled by QueryErrorHandler
     }
   };
@@ -46,8 +46,14 @@ export default function TaskNewPage() {
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-4">
         {/* 底稿编号 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">底稿编号 *</label>
+          <label
+            htmlFor="task-new-paperId"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            底稿编号 *
+          </label>
           <input
+            id="task-new-paperId"
             type="text"
             value={form.paperId}
             onChange={(e) => update('paperId', e.target.value)}
@@ -59,8 +65,14 @@ export default function TaskNewPage() {
 
         {/* 测试单位 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">测试单位 *</label>
+          <label
+            htmlFor="task-new-unitName"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            测试单位 *
+          </label>
           <input
+            id="task-new-unitName"
             type="text"
             value={form.unitName}
             onChange={(e) => update('unitName', e.target.value)}
@@ -72,15 +84,21 @@ export default function TaskNewPage() {
 
         {/* 业务场景 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">业务场景 *</label>
+          <label
+            htmlFor="task-new-scenarioId"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            业务场景 *
+          </label>
           <select
+            id="task-new-scenarioId"
             value={form.scenarioId}
             onChange={(e) => update('scenarioId', e.target.value)}
             className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           >
             <option value="">请选择业务场景</option>
-            {scenarios.map((s: any) => (
+            {scenarios.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.processLevel1} / {s.processLevel2} — {s.name}
               </option>
@@ -91,20 +109,34 @@ export default function TaskNewPage() {
         {/* 抽样信息 */}
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">抽样方法</label>
+            <label
+              htmlFor="task-new-samplingMethod"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              抽样方法
+            </label>
             <select
+              id="task-new-samplingMethod"
               value={form.samplingMethod}
               onChange={(e) => update('samplingMethod', e.target.value)}
               className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {samplingMethods.map((m) => (
-                <option key={m} value={m}>{m}</option>
+                <option key={m} value={m}>
+                  {m}
+                </option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">抽样期间</label>
+            <label
+              htmlFor="task-new-samplingPeriod"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              抽样期间
+            </label>
             <input
+              id="task-new-samplingPeriod"
               type="text"
               value={form.samplingPeriod}
               onChange={(e) => update('samplingPeriod', e.target.value)}
@@ -113,8 +145,14 @@ export default function TaskNewPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">样本来源</label>
+            <label
+              htmlFor="task-new-samplingSource"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              样本来源
+            </label>
             <input
+              id="task-new-samplingSource"
               type="text"
               value={form.samplingSource}
               onChange={(e) => update('samplingSource', e.target.value)}

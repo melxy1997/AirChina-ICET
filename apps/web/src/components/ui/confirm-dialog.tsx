@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -11,7 +11,16 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-export function ConfirmDialog({ open, title, message, confirmLabel = '确认', cancelLabel = '取消', variant = 'default', onConfirm, onCancel }: ConfirmDialogProps) {
+export function ConfirmDialog({
+  open,
+  title,
+  message,
+  confirmLabel = '确认',
+  cancelLabel = '取消',
+  variant = 'default',
+  onConfirm,
+  onCancel,
+}: ConfirmDialogProps) {
   if (!open) return null;
 
   return (
@@ -20,10 +29,15 @@ export function ConfirmDialog({ open, title, message, confirmLabel = '确认', c
         <h3 className="text-lg font-bold mb-2">{title}</h3>
         <p className="text-gray-600 text-sm mb-6">{message}</p>
         <div className="flex justify-end gap-3">
-          <button onClick={onCancel} className="px-4 py-2 text-sm rounded border hover:bg-gray-50">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 text-sm rounded border hover:bg-gray-50"
+          >
             {cancelLabel}
           </button>
           <button
+            type="button"
             onClick={onConfirm}
             className={`px-4 py-2 text-sm rounded text-white ${
               variant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
@@ -39,8 +53,18 @@ export function ConfirmDialog({ open, title, message, confirmLabel = '确认', c
 
 /** Hook for confirm dialogs */
 export function useConfirm() {
-  const [state, setState] = useState<{ open: boolean; title: string; message: string; variant: 'danger' | 'default'; resolver: ((v: boolean) => void) | null }>({
-    open: false, title: '', message: '', variant: 'default', resolver: null,
+  const [state, setState] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    variant: 'danger' | 'default';
+    resolver: ((v: boolean) => void) | null;
+  }>({
+    open: false,
+    title: '',
+    message: '',
+    variant: 'default',
+    resolver: null,
   });
 
   const confirm = (title: string, message: string, variant: 'danger' | 'default' = 'default') => {
@@ -60,7 +84,14 @@ export function useConfirm() {
   };
 
   const dialog = state.open ? (
-    <ConfirmDialog open={state.open} title={state.title} message={state.message} variant={state.variant} onConfirm={handleConfirm} onCancel={handleCancel} />
+    <ConfirmDialog
+      open={state.open}
+      title={state.title}
+      message={state.message}
+      variant={state.variant}
+      onConfirm={handleConfirm}
+      onCancel={handleCancel}
+    />
   ) : null;
 
   return { confirm, dialog };

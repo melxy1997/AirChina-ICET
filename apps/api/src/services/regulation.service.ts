@@ -25,7 +25,7 @@ export async function getRegulation(id: string, orgId: string) {
     include: {
       fileRef: true,
       controlPoints: { orderBy: { controlId: 'asc' } },
-      scenarios: { select: { scenario: { select: { id: true, name: true } } } },
+      scenarios: { select: { id: true, name: true, processLevel1: true, processLevel2: true } },
     },
   });
   if (!regulation) throw new AppError(404, '规章制度不存在');

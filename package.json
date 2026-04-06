@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "lint": "biome check . && turbo run lint",
+    "lint": "biome check . && turbo run typecheck",
     "lint:fix": "biome check --write .",
     "clean": "turbo run clean && rm -rf node_modules",
     "format": "biome format --write ."

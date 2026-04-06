@@ -1,6 +1,11 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import crypto from 'node:crypto';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { prisma } from '../db/prisma.js';
 import { AppError } from '../middleware/error.middleware.js';
 
@@ -29,13 +34,16 @@ const BUCKET = process.env.S3_BUCKET || 'icet-files';
 export async function ensureBucket(): Promise<void> {
   const client = getS3Client();
   try {
-    await client.send(new (await import('@aws-sdk/client-s3')).CreateBucketCommand({ Bucket: BUCKET }));
+    await client.send(
+      new (await import('@aws-sdk/client-s3')).CreateBucketCommand({ Bucket: BUCKET }),
+    );
     console.log(`[S3] 存储桶 "${BUCKET}" 已创建`);
-  } catch (err: any) {
-    if (err.name === 'BucketAlreadyOwnedByYou' || err.$metadata?.httpStatusCode === 409) {
+  } catch (err: unknown) {
+    const e = err as { name?: string; $metadata?: { httpStatusCode?: number }; message?: string };
+    if (e.name === 'BucketAlreadyOwnedByYou' || e.$metadata?.httpStatusCode === 409) {
       console.log(`[S3] 存储桶 "${BUCKET}" 已存在`);
     } else {
-      console.error(`[S3] 检查存储桶失败:`, err.message);
+      console.error(`[S3] 检查存储桶失败:`, e.message ?? err);
     }
   }
 }
@@ -53,16 +61,18 @@ export async function uploadFile(data: {
   const checksum = crypto.createHash('sha256').update(data.buffer).digest('hex');
 
   const client = getS3Client();
-  await client.send(new PutObjectCommand({
-    Bucket: BUCKET,
-    Key: key,
-    Body: data.buffer,
-    ContentType: data.mimeType,
-    Metadata: {
-      'original-name': data.originalName,
-      checksum,
-    },
-  }));
+  await client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: data.buffer,
+      ContentType: data.mimeType,
+      Metadata: {
+        'original-name': data.originalName,
+        checksum,
+      },
+    }),
+  );
 
   const fileType = mapFileType(data.mimeType);
 
@@ -87,11 +97,15 @@ export async function getDownloadUrl(fileRefId: string): Promise<string> {
   if (!fileRef) throw new AppError(404, '文件不存在');
 
   const client = getS3Client();
-  const url = await getSignedUrl(client, new GetObjectCommand({
-    Bucket: BUCKET,
-    Key: fileRef.storagePath,
-    ResponseContentDisposition: `attachment; filename="${encodeURIComponent(fileRef.originalName)}"`,
-  }), { expiresIn: 3600 });
+  const url = await getSignedUrl(
+    client,
+    new GetObjectCommand({
+      Bucket: BUCKET,
+      Key: fileRef.storagePath,
+      ResponseContentDisposition: `attachment; filename="${encodeURIComponent(fileRef.originalName)}"`,
+    }),
+    { expiresIn: 3600 },
+  );
 
   return url;
 }
@@ -102,10 +116,12 @@ export async function getFileStream(fileRefId: string) {
   if (!fileRef) throw new AppError(404, '文件不存在');
 
   const client = getS3Client();
-  const response = await client.send(new GetObjectCommand({
-    Bucket: BUCKET,
-    Key: fileRef.storagePath,
-  }));
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: BUCKET,
+      Key: fileRef.storagePath,
+    }),
+  );
 
   return {
     stream: response.Body,

@@ -1,6 +1,5 @@
-import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { AxiosError } from 'axios';
+import { useEffect } from 'react';
 import { useToast } from '@/components/ui/toast';
 
 export function QueryErrorHandler() {
@@ -13,12 +12,9 @@ export function QueryErrorHandler() {
       toast(message, 'error');
     };
 
-    queryClient.getDefaultOptions().mutations?.onError?.(handler as any);
-
-    // Set global mutation error handler
     queryClient.setDefaultOptions({
       mutations: {
-        onError: handler as any,
+        onError: handler,
       },
     });
   }, [queryClient, toast]);

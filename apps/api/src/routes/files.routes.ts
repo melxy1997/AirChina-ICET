@@ -1,6 +1,7 @@
 import { Router } from 'express';
+import { paramStr } from '../lib/req-params.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
-import { asyncHandler, AppError } from '../middleware/error.middleware.js';
+import { AppError, asyncHandler } from '../middleware/error.middleware.js';
 import { uploadMemory } from '../middleware/upload.middleware.js';
 import * as fileService from '../services/file.service.js';
 
@@ -15,7 +16,7 @@ fileRoutes.post(
     if (!req.file) {
       throw new AppError(400, '未提供文件');
     }
-    const userId = (req as any).userId;
+    const userId = req.userId!;
     const prefix = (req.body.prefix as string) || undefined;
     const fileRef = await fileService.uploadFile({
       buffer: req.file.buffer,
@@ -32,7 +33,7 @@ fileRoutes.post(
 fileRoutes.get(
   '/:id',
   asyncHandler(async (req, res) => {
-    const url = await fileService.getDownloadUrl(req.params.id);
+    const url = await fileService.getDownloadUrl(paramStr(req.params.id));
     res.json({ url });
   }),
 );
@@ -41,9 +42,14 @@ fileRoutes.get(
 fileRoutes.get(
   '/:id/download',
   asyncHandler(async (req, res) => {
-    const { stream, contentType, originalName } = await fileService.getFileStream(req.params.id);
+    const { stream, contentType, originalName } = await fileService.getFileStream(
+      paramStr(req.params.id),
+    );
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(originalName)}"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(originalName)}"`,
+    );
     if (stream) {
       (stream as NodeJS.ReadableStream).pipe(res);
     } else {
@@ -56,7 +62,7 @@ fileRoutes.get(
 fileRoutes.delete(
   '/:id',
   asyncHandler(async (req, res) => {
-    await fileService.deleteFile(req.params.id);
+    await fileService.deleteFile(paramStr(req.params.id));
     res.json({ success: true });
   }),
 );

@@ -57,10 +57,13 @@ export function createApp() {
   app.use('/api/v1', (req, _res, next) => {
     const page = Number(req.query.page);
     const pageSize = Number(req.query.pageSize);
-    if (req.query.page !== undefined && (isNaN(page) || page < 1)) {
+    if (req.query.page !== undefined && (Number.isNaN(page) || page < 1)) {
       req.query.page = '1';
     }
-    if (req.query.pageSize !== undefined && (isNaN(pageSize) || pageSize < 1 || pageSize > 100)) {
+    if (
+      req.query.pageSize !== undefined &&
+      (Number.isNaN(pageSize) || pageSize < 1 || pageSize > 100)
+    ) {
       req.query.pageSize = '20';
     }
     next();

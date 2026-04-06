@@ -45,7 +45,11 @@ export function Layout() {
         <div className="p-4 border-t border-slate-700">
           <div className="text-sm text-slate-300">{user?.name}</div>
           <div className="text-xs text-slate-500">{user?.role}</div>
-          <button onClick={handleLogout} className="text-xs text-slate-400 hover:text-white mt-2">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="text-xs text-slate-400 hover:text-white mt-2"
+          >
             退出登录
           </button>
         </div>

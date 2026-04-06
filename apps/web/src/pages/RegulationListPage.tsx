@@ -1,6 +1,7 @@
 import { useRef } from 'react';
-import { useRegulations } from '@/lib/hooks';
 import { api } from '@/lib/api';
+import type { RegulationListItem } from '@/lib/api-types';
+import { useRegulations } from '@/lib/hooks';
 
 export default function RegulationListPage() {
   const { data, isLoading, refetch } = useRegulations();
@@ -10,20 +11,38 @@ export default function RegulationListPage() {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    await api.upload('/regulations', file, { title: file.name.replace(/\.[^.]+$/, ''), version: '1.0' });
+    await api.upload('/regulations', file, {
+      title: file.name.replace(/\.[^.]+$/, ''),
+      version: '1.0',
+    });
     if (fileRef.current) fileRef.current.value = '';
     refetch();
   };
 
-  const parseStatusLabel: Record<string, string> = { QUEUED: '待解析', RUNNING: '解析中', COMPLETED: '已完成', FAILED: '失败' };
+  const parseStatusLabel: Record<string, string> = {
+    QUEUED: '待解析',
+    RUNNING: '解析中',
+    COMPLETED: '已完成',
+    FAILED: '失败',
+  };
 
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">规章制度库</h2>
-        <label className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 cursor-pointer">
+        <label
+          htmlFor="regulation-upload"
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 cursor-pointer"
+        >
           上传规章制度
-          <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={handleUpload} />
+          <input
+            id="regulation-upload"
+            ref={fileRef}
+            type="file"
+            accept=".pdf"
+            className="hidden"
+            onChange={handleUpload}
+          />
         </label>
       </div>
 
@@ -43,18 +62,26 @@ export default function RegulationListPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {regulations.map((r: any) => (
+              {regulations.map((r: RegulationListItem) => (
                 <tr key={r.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium">{r.title}</td>
                   <td className="px-4 py-3">{r.version}</td>
-                  <td className="px-4 py-3 text-center">{parseStatusLabel[r.parseStatus] || r.parseStatus}</td>
+                  <td className="px-4 py-3 text-center">
+                    {parseStatusLabel[r.parseStatus] || r.parseStatus}
+                  </td>
                   <td className="px-4 py-3 text-center">{r._count?.controlPoints ?? 0}</td>
                   <td className="px-4 py-3 text-center">{r._count?.scenarios ?? 0}</td>
-                  <td className="px-4 py-3 text-gray-500">{new Date(r.createdAt).toLocaleDateString('zh-CN')}</td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {new Date(r.createdAt).toLocaleDateString('zh-CN')}
+                  </td>
                 </tr>
               ))}
               {regulations.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">暂无规章制度</td></tr>
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                    暂无规章制度
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

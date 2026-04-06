@@ -27,8 +27,11 @@ export default function LoginPage() {
         <h1 className="text-2xl font-bold text-center mb-6">ICET 登录</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">邮箱</label>
+            <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-1">
+              邮箱
+            </label>
             <input
+              id="login-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -37,8 +40,14 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">密码</label>
+            <label
+              htmlFor="login-password"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              密码
+            </label>
             <input
+              id="login-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

@@ -1,7 +1,8 @@
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useTasks } from '@/lib/hooks';
-import { TASK_STATUS_LABELS } from '@icet/shared';
 import type { TaskStatus } from '@icet/shared';
+import { TASK_STATUS_LABELS } from '@icet/shared';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import type { TaskListItem } from '@/lib/api-types';
+import { useTasks } from '@/lib/hooks';
 
 const statusColor: Record<string, string> = {
   DRAFT: 'bg-gray-100 text-gray-700',
@@ -29,13 +30,18 @@ export default function TaskListPage() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">测试任务</h2>
-        <button onClick={() => navigate('/tasks/new')} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        <button
+          type="button"
+          onClick={() => navigate('/tasks/new')}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
           新建任务
         </button>
       </div>
 
       <div className="flex gap-2 mb-4 flex-wrap">
         <button
+          type="button"
           onClick={() => setSearchParams({})}
           className={`px-3 py-1 rounded text-sm ${!statusFilter ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
         >
@@ -43,6 +49,7 @@ export default function TaskListPage() {
         </button>
         {Object.entries(TASK_STATUS_LABELS).map(([key, label]) => (
           <button
+            type="button"
             key={key}
             onClick={() => setSearchParams({ status: key })}
             className={`px-3 py-1 rounded text-sm ${statusFilter === key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
@@ -69,23 +76,43 @@ export default function TaskListPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {tasks.map((t: any) => (
-                <tr key={t.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/tasks/${t.id}`)}>
+              {tasks.map((t: TaskListItem) => (
+                <tr
+                  key={t.id}
+                  className="hover:bg-gray-50 cursor-pointer"
+                  onClick={() => navigate(`/tasks/${t.id}`)}
+                >
                   <td className="px-4 py-3 font-medium">{t.paperId}</td>
                   <td className="px-4 py-3">{t.unitName}</td>
-                  <td className="px-4 py-3 text-gray-500">{t.scenario?.processLevel1} / {t.scenario?.processLevel2}</td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {t.scenario?.processLevel1} / {t.scenario?.processLevel2}
+                  </td>
                   <td className="px-4 py-3">{t.tester?.name}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${statusColor[t.status] || 'bg-gray-100'}`}>
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-medium ${statusColor[t.status] || 'bg-gray-100'}`}
+                    >
                       {TASK_STATUS_LABELS[t.status as TaskStatus] || t.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center">{t._count?.anomalies > 0 ? <span className="text-red-500 font-bold">{t._count.anomalies}</span> : '-'}</td>
-                  <td className="px-4 py-3 text-gray-500">{new Date(t.createdAt).toLocaleDateString('zh-CN')}</td>
+                  <td className="px-4 py-3 text-center">
+                    {(t._count?.anomalies ?? 0) > 0 ? (
+                      <span className="text-red-500 font-bold">{t._count?.anomalies}</span>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {new Date(t.createdAt).toLocaleDateString('zh-CN')}
+                  </td>
                 </tr>
               ))}
               {tasks.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">暂无测试任务</td></tr>
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                    暂无测试任务
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

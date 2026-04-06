@@ -1,5 +1,12 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
+import type {
+  RegulationListItem,
+  SampleView,
+  ScenarioListItem,
+  TaskDetailApi,
+  TaskListItem,
+} from './api-types';
 
 // ── Query Keys ──
 export const queryKeys = {
@@ -13,17 +20,17 @@ export const queryKeys = {
 };
 
 // ── Scenario Hooks ──
-export function useScenarios(page = 1, pageSize = 20) {
+export function useScenarios(page = 1, _pageSize = 20) {
   return useQuery({
     queryKey: queryKeys.scenarios(page),
-    queryFn: () => api.get<{ data: any[]; total: number }>('/scenarios'),
+    queryFn: () => api.get<{ data: ScenarioListItem[]; total: number }>('/scenarios'),
   });
 }
 
 export function useScenario(id: string) {
   return useQuery({
     queryKey: queryKeys.scenario(id),
-    queryFn: () => api.get<any>(`/scenarios/${id}`),
+    queryFn: () => api.get<ScenarioListItem>(`/scenarios/${id}`),
     enabled: !!id,
   });
 }
@@ -31,7 +38,7 @@ export function useScenario(id: string) {
 export function useCreateScenario() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: any) => api.post('/scenarios', data),
+    mutationFn: (data: Record<string, unknown>) => api.post('/scenarios', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['scenarios'] }),
   });
 }
@@ -39,7 +46,8 @@ export function useCreateScenario() {
 export function useUpdateScenario() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: any) => api.put(`/scenarios/${id}`, data),
+    mutationFn: ({ id, ...data }: { id: string } & Record<string, unknown>) =>
+      api.put(`/scenarios/${id}`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['scenarios'] }),
   });
 }
@@ -58,7 +66,9 @@ export function useTasks(filters?: Record<string, string>) {
     queryKey: queryKeys.tasks(filters),
     queryFn: () => {
       const params = new URLSearchParams(filters).toString();
-      return api.get<{ data: any[]; total: number }>(`/tasks${params ? `?${params}` : ''}`);
+      return api.get<{ data: TaskListItem[]; total: number }>(
+        `/tasks${params ? `?${params}` : ''}`,
+      );
     },
   });
 }
@@ -66,7 +76,7 @@ export function useTasks(filters?: Record<string, string>) {
 export function useTask(id: string) {
   return useQuery({
     queryKey: queryKeys.task(id),
-    queryFn: () => api.get<any>(`/tasks/${id}`),
+    queryFn: () => api.get<TaskDetailApi>(`/tasks/${id}`),
     enabled: !!id,
   });
 }
@@ -74,7 +84,7 @@ export function useTask(id: string) {
 export function useCreateTask() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: any) => api.post('/tasks', data),
+    mutationFn: (data: Record<string, unknown>) => api.post<{ id: string }>('/tasks', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
   });
 }
@@ -95,7 +105,8 @@ export function useTransitionStatus() {
 export function useSamples(taskId: string) {
   return useQuery({
     queryKey: queryKeys.samples(taskId),
-    queryFn: () => api.get<{ sampleSetId: string | null; samples: any[] }>(`/tasks/${taskId}/samples`),
+    queryFn: () =>
+      api.get<{ sampleSetId: string | null; samples: SampleView[] }>(`/tasks/${taskId}/samples`),
     enabled: !!taskId,
   });
 }
@@ -103,25 +114,37 @@ export function useSamples(taskId: string) {
 export function useAddSample() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ taskId, ...data }: any) => api.post(`/tasks/${taskId}/samples`, data),
-    onSuccess: (_data, variables) => qc.invalidateQueries({ queryKey: queryKeys.samples(variables.taskId) }),
+    mutationFn: ({ taskId, ...data }: { taskId: string } & Record<string, unknown>) =>
+      api.post(`/tasks/${taskId}/samples`, data),
+    onSuccess: (_data, variables) =>
+      qc.invalidateQueries({ queryKey: queryKeys.samples(variables.taskId) }),
   });
 }
 
 export function useUpdateStepResult() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ taskId, sampleId, stepId, ...data }: any) =>
+    mutationFn: ({
+      taskId,
+      sampleId,
+      stepId,
+      ...data
+    }: {
+      taskId: string;
+      sampleId: string;
+      stepId: string;
+    } & Record<string, unknown>) =>
       api.put(`/tasks/${taskId}/samples/${sampleId}/steps/${stepId}`, data),
-    onSuccess: (_data, variables) => qc.invalidateQueries({ queryKey: queryKeys.samples(variables.taskId) }),
+    onSuccess: (_data, variables) =>
+      qc.invalidateQueries({ queryKey: queryKeys.samples(variables.taskId) }),
   });
 }
 
 // ── Regulation Hooks ──
-export function useRegulations(page = 1, pageSize = 20) {
+export function useRegulations(page = 1, _pageSize = 20) {
   return useQuery({
     queryKey: queryKeys.regulations(page),
-    queryFn: () => api.get<{ data: any[]; total: number }>('/regulations'),
+    queryFn: () => api.get<{ data: RegulationListItem[]; total: number }>('/regulations'),
   });
 }
 

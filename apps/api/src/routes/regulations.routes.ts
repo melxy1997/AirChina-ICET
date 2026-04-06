@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { paramStr } from '../lib/req-params.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
-import { asyncHandler, AppError } from '../middleware/error.middleware.js';
+import { AppError, asyncHandler } from '../middleware/error.middleware.js';
 import { uploadMemory } from '../middleware/upload.middleware.js';
-import * as regulationService from '../services/regulation.service.js';
 import * as fileService from '../services/file.service.js';
+import * as regulationService from '../services/regulation.service.js';
 
 export const regulationRoutes = Router();
 regulationRoutes.use(requireAuth);
@@ -48,10 +48,6 @@ regulationRoutes.post(
       version: body.version || '1.0',
       effectiveDate: body.effectiveDate || undefined,
       expiryDate: body.expiryDate || undefined,
-      originalName: req.file.originalname,
-      mimeType: req.file.mimetype,
-      sizeBytes: req.file.size,
-      storagePath: fileRef.storagePath,
       fileRefId: fileRef.id,
       uploadedBy: userId,
     });

@@ -30,11 +30,9 @@ export function buildWorkbook(data: WorkingPaper): ArrayBuffer {
  */
 function buildWorkingPaperSheet(data: WorkingPaper): XLSX.WorkSheet {
   const rows: (string | number)[][] = [];
-  let rowIdx = 0;
 
   // §1 标题行
   rows.push([data.documentName]);
-  rowIdx++;
 
   // §2 基本信息
   rows.push(['测试底稿编号', data.paperId]);
@@ -42,34 +40,28 @@ function buildWorkingPaperSheet(data: WorkingPaper): XLSX.WorkSheet {
   rows.push(['测试执行人', data.testerName]);
   rows.push(['测试审阅人', data.reviewerName]);
   rows.push(['完成日期', data.completionDate]);
-  rowIdx += 5;
 
   // §3 流程信息
   rows.push(['一级流程', data.processLevel1]);
   rows.push(['二级流程', data.processLevel2]);
   rows.push(['三级流程', data.processLevel3]);
-  rowIdx += 3;
 
   // §4 控制点描述
   rows.push(['控制点描述', data.controlDescription]);
-  rowIdx++;
 
   // §5 测试结果
   rows.push(['控制编号', data.testResult.controlIds]);
   rows.push(['测试结果', data.testResult.result]);
-  rowIdx += 2;
 
   // §6 抽样信息
   rows.push(['抽样方法', data.sampling.method]);
   rows.push(['抽样期间', data.sampling.period]);
   rows.push(['样本数量', data.sampling.sampleCount]);
   rows.push(['样本来源', data.sampling.sampleSource]);
-  rowIdx += 4;
 
   // §7 测试步骤 + 样本矩阵
   const stepHeaders = ['样本序号', '样本内容', ...data.steps.map((s) => `步骤${s.index}`), '备注'];
   rows.push(stepHeaders);
-  rowIdx++;
 
   for (const sample of data.samples) {
     const row: (string | number)[] = [
@@ -79,7 +71,6 @@ function buildWorkingPaperSheet(data: WorkingPaper): XLSX.WorkSheet {
       sample.remark ?? '',
     ];
     rows.push(row);
-    rowIdx++;
   }
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
