@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import * as scenarioService from '../services/scenario.service.js';
+import { paramStr } from '../lib/req-params.js';
 
 export const scenarioRoutes = Router();
 scenarioRoutes.use(requireAuth);
@@ -19,7 +20,7 @@ const updateSchema = createSchema.partial();
 
 /** GET /scenarios */
 scenarioRoutes.get('/', asyncHandler(async (req, res) => {
-  const orgId = (req as any).userId; // TODO: 从用户获取 orgId
+  const orgId = (req as any).orgId;
   const page = Number(req.query.page) || 1;
   const pageSize = Number(req.query.pageSize) || 20;
   const result = await scenarioService.listScenarios(orgId, page, pageSize);
@@ -30,9 +31,10 @@ scenarioRoutes.get('/', asyncHandler(async (req, res) => {
 scenarioRoutes.post('/', asyncHandler(async (req, res) => {
   const data = createSchema.parse(req.body);
   const userId = (req as any).userId;
+  const orgId = (req as any).orgId;
   const result = await scenarioService.createScenario({
     ...data,
-    organizationId: 'TODO', // TODO: 从用户获取 orgId
+    organizationId: orgId,
     createdBy: userId,
   });
   res.status(201).json(result);
@@ -40,34 +42,34 @@ scenarioRoutes.post('/', asyncHandler(async (req, res) => {
 
 /** GET /scenarios/:id */
 scenarioRoutes.get('/:id', asyncHandler(async (req, res) => {
-  const orgId = (req as any).userId; // TODO
-  const result = await scenarioService.getScenario(req.params.id, orgId);
+  const orgId = (req as any).orgId;
+  const result = await scenarioService.getScenario(paramStr(req.params.id), orgId);
   res.json(result);
 }));
 
 /** PUT /scenarios/:id */
 scenarioRoutes.put('/:id', asyncHandler(async (req, res) => {
-  const orgId = (req as any).userId; // TODO
+  const orgId = (req as any).orgId;
   const data = updateSchema.parse(req.body);
-  const result = await scenarioService.updateScenario(req.params.id, orgId, data);
+  const result = await scenarioService.updateScenario(paramStr(req.params.id), orgId, data);
   res.json(result);
 }));
 
 /** DELETE /scenarios/:id */
 scenarioRoutes.delete('/:id', asyncHandler(async (req, res) => {
-  const orgId = (req as any).userId; // TODO
-  await scenarioService.deleteScenario(req.params.id, orgId);
+  const orgId = (req as any).orgId;
+  await scenarioService.deleteScenario(paramStr(req.params.id), orgId);
   res.json({ success: true });
 }));
 
 /** POST /scenarios/:id/regulations/:regId */
 scenarioRoutes.post('/:id/regulations/:regId', asyncHandler(async (req, res) => {
-  await scenarioService.linkRegulation(req.params.id, req.params.regId);
+  await scenarioService.linkRegulation(paramStr(req.params.id), paramStr(req.params.regId));
   res.status(201).json({ success: true });
 }));
 
 /** DELETE /scenarios/:id/regulations/:regId */
 scenarioRoutes.delete('/:id/regulations/:regId', asyncHandler(async (req, res) => {
-  await scenarioService.unlinkRegulation(req.params.id, req.params.regId);
+  await scenarioService.unlinkRegulation(paramStr(req.params.id), paramStr(req.params.regId));
   res.json({ success: true });
 }));

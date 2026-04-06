@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { asyncHandler } from '../middleware/error.middleware.js';
+import { asyncHandler, AppError } from '../middleware/error.middleware.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
+import { prisma } from '../db/prisma.js';
 import * as sampleService from '../services/sample.service.js';
 import * as executionService from '../services/execution.service.js';
+import { paramStr } from '../lib/req-params.js';
 
 export const sampleRoutes = Router();
 sampleRoutes.use(requireAuth);
@@ -29,17 +31,35 @@ const batchResultSchema = z.object({
   })),
 });
 
+/** 校验任务归属当前组织 */
+async function verifyTaskOrg(taskId: string | string[], orgId: string) {
+  const id = paramStr(taskId);
+  if (!id) throw new AppError(400, '无效的任务 ID');
+  const task = await prisma.testTask.findUnique({
+    where: { id },
+    select: { id: true, organizationId: true },
+  });
+  if (!task || task.organizationId !== orgId) {
+    throw new AppError(404, '测试任务不存在');
+  }
+  return task;
+}
+
 /** GET /tasks/:id/samples */
 sampleRoutes.get('/:id/samples', asyncHandler(async (req, res) => {
-  const result = await sampleService.listSamples(req.params.id);
+  const orgId = (req as any).orgId;
+  await verifyTaskOrg(req.params.id, orgId);
+  const result = await sampleService.listSamples(paramStr(req.params.id));
   res.json(result);
 }));
 
 /** POST /tasks/:id/samples */
 sampleRoutes.post('/:id/samples', asyncHandler(async (req, res) => {
+  const orgId = (req as any).orgId;
+  await verifyTaskOrg(req.params.id, orgId);
   const data = addSampleSchema.parse(req.body);
   const userId = (req as any).userId;
-  const result = await sampleService.addSample(req.params.id, {
+  const result = await sampleService.addSample(paramStr(req.params.id), {
     ...data,
     addedBy: userId,
   });
@@ -48,24 +68,30 @@ sampleRoutes.post('/:id/samples', asyncHandler(async (req, res) => {
 
 /** PUT /tasks/:id/samples/:sid */
 sampleRoutes.put('/:id/samples/:sid', asyncHandler(async (req, res) => {
+  const orgId = (req as any).orgId;
+  await verifyTaskOrg(req.params.id, orgId);
   const data = req.body;
-  const result = await sampleService.updateSample(req.params.sid, data);
+  const result = await sampleService.updateSample(paramStr(req.params.sid), data);
   res.json(result);
 }));
 
 /** DELETE /tasks/:id/samples/:sid */
 sampleRoutes.delete('/:id/samples/:sid', asyncHandler(async (req, res) => {
-  await sampleService.deleteSample(req.params.sid);
+  const orgId = (req as any).orgId;
+  await verifyTaskOrg(req.params.id, orgId);
+  await sampleService.deleteSample(paramStr(req.params.sid));
   res.json({ success: true });
 }));
 
 /** PUT /tasks/:id/samples/:sid/steps/:stepId */
 sampleRoutes.put('/:id/samples/:sid/steps/:stepId', asyncHandler(async (req, res) => {
+  const orgId = (req as any).orgId;
+  await verifyTaskOrg(req.params.id, orgId);
   const data = updateResultSchema.parse(req.body);
   const userId = (req as any).userId;
   const result = await executionService.updateStepResult({
-    sampleId: req.params.sid,
-    stepId: req.params.stepId,
+    sampleId: paramStr(req.params.sid),
+    stepId: paramStr(req.params.stepId),
     result: data.result,
     executedBy: userId,
     humanNote: data.humanNote,
@@ -75,6 +101,8 @@ sampleRoutes.put('/:id/samples/:sid/steps/:stepId', asyncHandler(async (req, res
 
 /** POST /tasks/:id/executions/batch */
 sampleRoutes.post('/:id/executions/batch', asyncHandler(async (req, res) => {
+  const orgId = (req as any).orgId;
+  await verifyTaskOrg(req.params.id, orgId);
   const { items } = batchResultSchema.parse(req.body);
   const userId = (req as any).userId;
   const result = await executionService.batchUpdateResults(

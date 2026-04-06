@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import * as taskService from '../services/task.service.js';
+import { paramStr } from '../lib/req-params.js';
 
 export const taskRoutes = Router();
 taskRoutes.use(requireAuth);
@@ -26,7 +27,7 @@ const transitionSchema = z.object({
 
 /** GET /tasks */
 taskRoutes.get('/', asyncHandler(async (req, res) => {
-  const orgId = (req as any).userId; // TODO: 从用户获取 orgId
+  const orgId = (req as any).orgId;
   const page = Number(req.query.page) || 1;
   const pageSize = Number(req.query.pageSize) || 20;
   const filters = {
@@ -41,9 +42,10 @@ taskRoutes.get('/', asyncHandler(async (req, res) => {
 taskRoutes.post('/', asyncHandler(async (req, res) => {
   const data = createSchema.parse(req.body);
   const userId = (req as any).userId;
+  const orgId = (req as any).orgId;
   const result = await taskService.createTask({
     ...data,
-    organizationId: 'TODO', // TODO
+    organizationId: orgId,
     createdBy: userId,
   });
   res.status(201).json(result);
@@ -51,24 +53,24 @@ taskRoutes.post('/', asyncHandler(async (req, res) => {
 
 /** GET /tasks/:id */
 taskRoutes.get('/:id', asyncHandler(async (req, res) => {
-  const orgId = (req as any).userId; // TODO
-  const result = await taskService.getTask(req.params.id, orgId);
+  const orgId = (req as any).orgId;
+  const result = await taskService.getTask(paramStr(req.params.id), orgId);
   res.json(result);
 }));
 
 /** PUT /tasks/:id */
 taskRoutes.put('/:id', asyncHandler(async (req, res) => {
-  const orgId = (req as any).userId; // TODO
+  const orgId = (req as any).orgId;
   const data = req.body;
-  const result = await taskService.updateTask(req.params.id, orgId, data);
+  const result = await taskService.updateTask(paramStr(req.params.id), orgId, data);
   res.json(result);
 }));
 
 /** PATCH /tasks/:id/status */
 taskRoutes.patch('/:id/status', asyncHandler(async (req, res) => {
-  const orgId = (req as any).userId; // TODO
+  const orgId = (req as any).orgId;
   const { status, comment } = transitionSchema.parse(req.body);
   const userId = (req as any).userId;
-  const result = await taskService.transitionStatus(req.params.id, orgId, status as any, userId, comment);
+  const result = await taskService.transitionStatus(paramStr(req.params.id), orgId, status as any, userId, comment);
   res.json(result);
 }));

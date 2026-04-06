@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../middleware/error.middleware.js';
+import { requireAuth } from '../middleware/auth.middleware.js';
 import * as authService from '../services/auth.service.js';
 
 export const authRoutes = Router();
@@ -32,13 +33,9 @@ authRoutes.post('/login', asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
-/** GET /auth/me */
-authRoutes.get('/me', asyncHandler(async (req, res) => {
+/** GET /auth/me — 需要认证 */
+authRoutes.get('/me', requireAuth, asyncHandler(async (req, res) => {
   const userId = (req as any).userId;
-  if (!userId) {
-    res.status(401).json({ error: { message: '未登录' } });
-    return;
-  }
   const user = await authService.me(userId);
   res.json(user);
 }));

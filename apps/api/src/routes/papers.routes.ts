@@ -1,16 +1,34 @@
 import { Router } from 'express';
-import { z } from 'zod';
-import { asyncHandler } from '../middleware/error.middleware.js';
+import { asyncHandler, AppError } from '../middleware/error.middleware.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
+import { prisma } from '../db/prisma.js';
 import * as paperService from '../services/paper.service.js';
+import { paramStr } from '../lib/req-params.js';
 
 export const paperRoutes = Router();
 paperRoutes.use(requireAuth);
 
+/** 校验任务归属当前组织 */
+async function verifyTaskOrg(taskId: string | string[], orgId: string) {
+  const id = Array.isArray(taskId) ? taskId[0] : taskId;
+  if (!id) throw new AppError(400, '无效的任务 ID');
+  const task = await prisma.testTask.findUnique({
+    where: { id },
+    select: { id: true, organizationId: true },
+  });
+  if (!task || task.organizationId !== orgId) {
+    throw new AppError(404, '测试任务不存在');
+  }
+  return task;
+}
+
 /** GET /tasks/:id/paper */
 paperRoutes.get('/:id/paper', asyncHandler(async (req, res) => {
-  const { prisma } = await import('../db/prisma.js');
-  const paper = await prisma.workingPaper.findUnique({ where: { taskId: req.params.id } });
+  const orgId = (req as any).orgId;
+  await verifyTaskOrg(req.params.id, orgId);
+  const taskId = paramStr(req.params.id);
+  if (!taskId) throw new AppError(400, '无效的任务 ID');
+  const paper = await prisma.workingPaper.findUnique({ where: { taskId } });
   if (!paper) {
     res.status(404).json({ error: { message: '工作底稿尚未生成' } });
     return;
@@ -20,29 +38,36 @@ paperRoutes.get('/:id/paper', asyncHandler(async (req, res) => {
 
 /** POST /tasks/:id/paper/generate */
 paperRoutes.post('/:id/paper/generate', asyncHandler(async (req, res) => {
-  const userId = (req as any).userId;
-  const orgId = 'TODO'; // TODO
+  const orgId = (req as any).orgId;
+  await verifyTaskOrg(req.params.id, orgId);
   const overrides = req.body.overrides;
-  const result = await paperService.generatePaper(req.params.id, orgId, overrides);
+  const taskId = paramStr(req.params.id);
+  if (!taskId) throw new AppError(400, '无效的任务 ID');
+  const result = await paperService.generatePaper(taskId, orgId, overrides);
   res.json(result);
 }));
 
 /** POST /tasks/:id/paper/export */
 paperRoutes.post('/:id/paper/export', asyncHandler(async (req, res) => {
-  const orgId = 'TODO'; // TODO
-  // 先生成/更新底稿
-  const paper = await paperService.generatePaper(req.params.id, orgId);
+  const orgId = (req as any).orgId;
+  await verifyTaskOrg(req.params.id, orgId);
+  const taskId = paramStr(req.params.id);
+  if (!taskId) throw new AppError(400, '无效的任务 ID');
+  const paper = await paperService.generatePaper(taskId, orgId);
   const buffer = await paperService.exportPaperExcel(paper.id, orgId);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', `attachment; filename="working-paper-${req.params.id}.xlsx"`);
+  res.setHeader('Content-Disposition', `attachment; filename="working-paper-${taskId}.xlsx"`);
   res.send(buffer);
 }));
 
 /** POST /tasks/:id/paper/submit */
 paperRoutes.post('/:id/paper/submit', asyncHandler(async (req, res) => {
+  const orgId = (req as any).orgId;
+  await verifyTaskOrg(req.params.id, orgId);
   const userId = (req as any).userId;
-  const { prisma } = await import('../db/prisma.js');
-  const paper = await prisma.workingPaper.findUnique({ where: { taskId: req.params.id } });
+  const taskId = paramStr(req.params.id);
+  if (!taskId) throw new AppError(400, '无效的任务 ID');
+  const paper = await prisma.workingPaper.findUnique({ where: { taskId } });
   if (!paper) {
     res.status(404).json({ error: { message: '工作底稿尚未生成' } });
     return;
@@ -53,10 +78,13 @@ paperRoutes.post('/:id/paper/submit', asyncHandler(async (req, res) => {
 
 /** POST /tasks/:id/paper/approve */
 paperRoutes.post('/:id/paper/approve', asyncHandler(async (req, res) => {
+  const orgId = (req as any).orgId;
+  await verifyTaskOrg(req.params.id, orgId);
   const userId = (req as any).userId;
   const { comment } = req.body;
-  const { prisma } = await import('../db/prisma.js');
-  const paper = await prisma.workingPaper.findUnique({ where: { taskId: req.params.id } });
+  const taskId = paramStr(req.params.id);
+  if (!taskId) throw new AppError(400, '无效的任务 ID');
+  const paper = await prisma.workingPaper.findUnique({ where: { taskId } });
   if (!paper) {
     res.status(404).json({ error: { message: '工作底稿尚未生成' } });
     return;
