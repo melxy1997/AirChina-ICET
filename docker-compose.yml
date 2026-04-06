@@ -5,7 +5,8 @@ services:
     container_name: icet-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      # 避免与本机 postgres / SSH 隧道等占用 5432 冲突，开发环境用 5433
+      - "5433:5432"
     environment:
       POSTGRES_USER: icet
       POSTGRES_PASSWORD: icet123

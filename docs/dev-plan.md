@@ -103,7 +103,7 @@ Agent核心 │         │         │         │   ████  │
          postgres:
            image: postgres:16-alpine
            env: POSTGRES_USER/PASSWORD/DB
-           ports: 5432:5432
+           ports: 5433:5432   # 宿主机 5433 → 容器 5432，避免与本机 PostgreSQL / SSH 等占用 5432
            volumes: pgdata:/var/lib/postgresql/data
          redis:
            image: redis:7-alpine
@@ -279,7 +279,8 @@ Agent核心 │         │         │         │   ████  │
        }
 
 0-B-2  执行初始迁移
-       pnpm prisma migrate dev --name init_full_schema
+       cd apps/api && pnpm prisma migrate dev --name init_full_schema
+       # 或在仓库根：pnpm --filter @icet/api exec prisma migrate dev --name init_full_schema
 
        验收：
          psql 中查看所有表已创建
@@ -1745,45 +1746,46 @@ apps/web 内部依赖链：
 
 ## 环境变量完整清单
 
+与仓库根目录 `.env.example` 保持一致；开发时请将 `.env.example` 复制为 **根目录 `.env`** 与 **`apps/api/.env`**（Prisma CLI 读取后者）。
+
 ```bash
-# apps/api/.env
+# apps/api/.env（节选，完整见 .env.example）
 
 # ── 服务 ──────────────────────────────────────
-PORT=3001
+PORT=3000
 NODE_ENV=development
 
 # ── 数据库 ────────────────────────────────────
-DATABASE_URL="postgresql://icet:icet_password@localhost:5432/icet_db"
+# 宿主机端口为 5433（见 docker-compose）；使用 127.0.0.1 避免 macOS 上 localhost→IPv6 问题
+DATABASE_URL=postgresql://icet:icet123@127.0.0.1:5433/icet?schema=public
 
 # ── Redis ─────────────────────────────────────
-REDIS_URL="redis://localhost:6379"
+REDIS_URL=redis://127.0.0.1:6379
 
-# ── MinIO ─────────────────────────────────────
-STORAGE_ENDPOINT="localhost"
-STORAGE_PORT=9000
-STORAGE_USE_SSL=false
-STORAGE_ACCESS_KEY="minioadmin"
-STORAGE_SECRET_KEY="minioadmin"
-STORAGE_BUCKET="icet-files"
+# ── MinIO（S3 兼容）───────────────────────────
+S3_ENDPOINT=http://127.0.0.1:9000
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadmin
+S3_BUCKET=icet-files
+S3_USE_SSL=false
 
 # ── JWT ───────────────────────────────────────
-JWT_SECRET="change-this-in-production-min-32-chars"
-JWT_EXPIRES_IN="7d"
+JWT_SECRET=your-jwt-secret-change-in-production
+JWT_EXPIRES_IN=7d
 
-# ── CORS ──────────────────────────────────────
-WEB_ORIGIN="http://localhost:5173"
+# ── CORS（可选，代码侧默认 localhost:5173）──────
+# CORS_ORIGIN=http://localhost:5173
 
 # ── LLM ───────────────────────────────────────
-OPENAI_API_KEY="sk-..."
-LLM_MODEL="Qwen-2.5-VL"
-LLM_TEMPERATURE=0
-LLM_MAX_TOKENS=4096
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_BASE_URL=https://api.openai.com/v1
+LLM_MODEL=Qwen-2.5-VL
 
-# ── Agent ─────────────────────────────────────
-AGENT_CONCURRENCY=3            # 并发执行步骤数
-AGENT_MAX_TOOL_CALLS=10        # 单步最大工具调用次数
-LANGGRAPH_CHECKPOINT_DB="./data/checkpoints.db"
+# ── Agent（规划值，落地时与实现同步）──────────
+# AGENT_CONCURRENCY=3
+# AGENT_MAX_TOOL_CALLS=10
+# LANGGRAPH_CHECKPOINT_DB="./data/checkpoints.db"
 
-# ── 系统用户（用于 AI 操作的系统身份） ──────
-SYSTEM_USER_ID="00000000-0000-0000-0000-000000000001"
+# ── 系统用户（用于 AI 操作的系统身份）─────────
+SYSTEM_USER_ID=00000000-0000-0000-0000-000000000000
 ```

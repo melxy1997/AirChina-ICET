@@ -977,7 +977,7 @@ icet/                                   # 项目根目录
 ├── pnpm-workspace.yaml
 ├── turbo.json                          # Turborepo 配置
 ├── tsconfig.base.json                  # 共享 TS 配置
-├── .env.example
+├── .env.example                        # 环境变量模板；开发时复制为根目录 .env 与 apps/api/.env
 │
 ├── packages/                           # 共享包
 │   ├── shared/                         # 共享类型与工具
@@ -1053,6 +1053,7 @@ icet/                                   # 项目根目录
 │   │
 │   └── api/                           # 后端 Node.js API
 │       ├── package.json
+│       ├── .env                       # 本地环境变量（Prisma CLI 在此目录加载）
 │       ├── src/
 │       │   ├── main.ts                # 入口
 │       │   ├── app.ts                 # Express 应用配置

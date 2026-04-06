@@ -330,7 +330,7 @@ AI层（apps/api/src/agents）：
 - 6 个路由占位：Dashboard、业务场景、规章制度、测试任务、任务详情、底稿归档
 
 **Docker Compose**：
-- PostgreSQL 16 Alpine（端口 5432，用户 icet/icet123）
+- PostgreSQL 16 Alpine（**宿主机端口 5433** 映射到容器内 5432，用户/库 `icet` / 密码见 `.env.example`；见下文「端口冲突」）
 - Redis 7 Alpine（端口 6379）
 - MinIO latest（API 端口 9000，Console 端口 9001，用户 minioadmin/minioadmin）
 - 命名卷持久化：pgdata、redisdata、miniodata
@@ -343,6 +343,17 @@ AI层（apps/api/src/agents）：
 | `tsc` 报 `Referenced project must have setting "composite": true` | 使用 TypeScript **工程引用**（`references`）时，被引用工程必须 `composite: true`，才能产出可供下游引用的构建信息与声明 | 在 `packages/shared/tsconfig.json` 的 `compilerOptions` 中设置 `"composite": true`，并保持 `outDir` / `rootDir` 与引用链一致 |
 | `tsc` 报 `'io' is possibly 'null'` | 模块级 `io` 可为 `null`，对可空变量赋值后，控制流分析未必将后续使用收窄为非 null | 在 `initWebSocket` 内使用局部变量 `const socketServer = new Server(...)`，对 `socketServer.on(...)` 注册事件，再赋给 `io`，避免非空断言 `!` |
 | 误以为需「降级 zod」才能装上依赖 | zod 新版本可能声明对 `fast-check` 等 peer；若安装仍因**同一类**文件系统问题在解压这些包时失败，易被误判为版本问题 | **优先**确认 `.npmrc` 已生效并重装；`^3.23` 与 `^3.24` 都会解析到当前 3.x，**不必**为规避 peer 刻意锁死旧版；仍失败时再查权限、杀毒或同步软件对 `node_modules` 的占用 |
+| `prisma migrate dev` 报 `P1012`：`Environment variable not found: DATABASE_URL` | Prisma 在 `apps/api` 下执行，只自动加载**含 `prisma/` 目录的包根目录**下的 `.env`；仅复制根目录 `.env.example` 为根目录 `.env` 时，若未同步 `apps/api/.env`，迁移脚本读不到变量 | 将 `.env.example` 复制为 **`apps/api/.env`**（并保留根目录 `.env` 供其他工具使用）；`DATABASE_URL` 等需与 `docker-compose` 中 Postgres 一致 |
+| Docker 无法使用 / `Cannot connect to the Docker daemon` | 本机未启动容器运行时或未暴露 Docker socket | 使用 **Rancher Desktop** 时，在设置中启用 **Use dockerd (moby)**，并确保应用处于运行状态后再执行 `docker compose` |
+| `prisma` 报 `P1001: Can't reach database server at localhost:5432`（容器已启动） | 在 macOS 上，`localhost` 常解析为 **IPv6（`::1`）**，而 Docker 端口映射多落在 **IPv4（`127.0.0.1`）**；客户端连 `::1` 时可能无服务监听 | 连接串中使用 **`127.0.0.1`** 代替 `localhost`（`.env.example` 已按此写法） |
+| `prisma` / `schema-engine` 报 `P1010: User was denied access on the database (not available)`（`psql` 进容器、或换工具却正常） | **宿主机 5432 上已有其他 PostgreSQL 或 SSH 端口转发**，与 Compose 映射竞争；Prisma 连 `127.0.0.1:5432` 时实际连到**本机**实例，而非容器内的 `icet` 库，Prisma 将底层错误映射为 P1010，故提示中的库名可能显示为 `(not available)` | **推荐**：将 Compose 中 Postgres 的宿主机端口改为 **5433**（`"5433:5432"`），`DATABASE_URL` 使用 `127.0.0.1:5433`（见当前 `docker-compose.yml` 与 `.env.example`）。**备选**：停掉本机 `postgres` 服务及占用 5432 的 SSH 隧道，再改回 `5432:5432` |
+| `pnpm --filter @icet/api db:migrate` 后出现 `prisma migrate dev "#" "生成" ...` 等奇怪参数 | 终端中命令与中文注释在同一行粘贴时，若换行/注释被截断，`shell` 可能把注释内容当作额外参数传给 `pnpm`，进而传给 `prisma` | 迁移命令单独一行执行，例如：`pnpm --filter @icet/api exec prisma migrate dev --name init`；需要迁移名时用 Prisma 的 `--name`，勿与行尾 `#` 注释粘在一起 |
+
+##### 本地数据库与 Prisma：排查要点（调研摘要）
+
+1. **确认实际连的是哪台 Postgres**：在宿主机执行 `lsof -nP -iTCP:5432 -sTCP:LISTEN`（或 `5433`），若存在本机 `postgres` 进程或 `ssh` 监听 `*:5432`，则 `127.0.0.1:5432` 未必指向容器。
+2. **验证 Prisma 引擎能否连通**：在 `node_modules/@prisma/engines/` 下找到本机对应的 `schema-engine-*` 可执行文件，执行 `cli --datasource '<DATABASE_URL>' can-connect-to-database`（退出码 0 表示连接串可用）；或直接运行 `pnpm exec prisma db execute --stdin --url='...' <<< 'SELECT 1'` 做等价验证。
+3. **容器内数据库正常 ≠ 宿主机 Prisma 正常**：`docker exec icet-postgres psql ...` 仅证明容器内实例可用；若宿主机端口被占用，Prisma 仍可能连错库。
 
 #### 当前项目结构
 
@@ -352,6 +363,7 @@ icet/
 │   ├── api/                          # 后端 Express API
 │   │   ├── package.json
 │   │   ├── tsconfig.json
+│   │   ├── .env                      # 本地配置（Prisma CLI 加载；由 .env.example 复制）
 │   │   ├── prisma/
 │   │   │   └── schema.prisma         # 15 个模型
 │   │   └── src/
@@ -382,7 +394,7 @@ icet/
 ├── pnpm-workspace.yaml
 ├── tsconfig.base.json
 ├── .npmrc                            # node-linker=hoisted
-├── .env.example
+├── .env.example                      # 模板；复制为根 .env 与 apps/api/.env
 └── readme.md
 ```
 
@@ -432,9 +444,10 @@ icet/
    这是系统所有工作的最终产物，先建立感性认识
 
 2. 搭建本地环境
-   docker compose up -d（启动PG+Redis+MinIO）
-   配置 .env
-   pnpm install + pnpm prisma migrate dev
+   docker compose up -d（启动 PG+Redis+MinIO；PostgreSQL 宿主机端口为 5433）
+   cp .env.example .env && cp .env.example apps/api/.env
+   pnpm install
+   pnpm --filter @icet/api exec prisma migrate dev --name init
 
 3. 从 packages/shared/src/types/ 开始读代码
    所有业务概念都在这里定义
@@ -456,5 +469,5 @@ icet/
 
 | 依赖 | 用途 | 获取方式 | 是否必须 |
 |------|------|----------|----------|
-| Docker Desktop | 本地基础设施（PG/Redis/MinIO） | docker.com | **必须** |
+| Docker Desktop / Rancher Desktop | 本地基础设施（PG/Redis/MinIO）；Rancher 需启用 dockerd (moby) | docker.com / rancherdesktop.io | **必须** |
 | Node.js 20 LTS | 运行时 | nodejs.org | **必须** |
