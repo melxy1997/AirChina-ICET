@@ -1,37 +1,74 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
+import * as taskService from '../services/task.service.js';
 
 export const taskRoutes = Router();
-
 taskRoutes.use(requireAuth);
 
-/** GET /tasks - 获取任务列表 */
-taskRoutes.get('/', asyncHandler(async (_req, res) => {
-  // TODO: Phase 1 实现
-  res.json({ data: [], total: 0, page: 1, pageSize: 20, totalPages: 0 });
+const createSchema = z.object({
+  scenarioId: z.string().uuid(),
+  paperId: z.string().min(1, '底稿编号不能为空'),
+  unitName: z.string().min(1, '测试单位不能为空'),
+  testerId: z.string().uuid(),
+  reviewerId: z.string().uuid().optional(),
+  regulationIds: z.array(z.string().uuid()).default([]),
+  samplingMethod: z.string().default('随机抽样'),
+  samplingPeriod: z.string().default(''),
+  samplingSource: z.string().default(''),
+});
+
+const transitionSchema = z.object({
+  status: z.string(),
+  comment: z.string().optional(),
+});
+
+/** GET /tasks */
+taskRoutes.get('/', asyncHandler(async (req, res) => {
+  const orgId = (req as any).userId; // TODO: 从用户获取 orgId
+  const page = Number(req.query.page) || 1;
+  const pageSize = Number(req.query.pageSize) || 20;
+  const filters = {
+    status: req.query.status as string | undefined,
+    testerId: req.query.testerId as string | undefined,
+  };
+  const result = await taskService.listTasks(orgId, page, pageSize, filters);
+  res.json(result);
 }));
 
-/** POST /tasks - 创建任务 */
-taskRoutes.post('/', asyncHandler(async (_req, res) => {
-  // TODO: Phase 1 实现
-  res.status(201).json({ message: 'Not implemented yet' });
+/** POST /tasks */
+taskRoutes.post('/', asyncHandler(async (req, res) => {
+  const data = createSchema.parse(req.body);
+  const userId = (req as any).userId;
+  const result = await taskService.createTask({
+    ...data,
+    organizationId: 'TODO', // TODO
+    createdBy: userId,
+  });
+  res.status(201).json(result);
 }));
 
-/** GET /tasks/:id - 获取任务详情 */
+/** GET /tasks/:id */
 taskRoutes.get('/:id', asyncHandler(async (req, res) => {
-  // TODO: Phase 1 实现
-  res.json({ id: req.params.id, message: 'Not implemented yet' });
+  const orgId = (req as any).userId; // TODO
+  const result = await taskService.getTask(req.params.id, orgId);
+  res.json(result);
 }));
 
-/** PUT /tasks/:id - 更新任务 */
+/** PUT /tasks/:id */
 taskRoutes.put('/:id', asyncHandler(async (req, res) => {
-  // TODO: Phase 1 实现
-  res.json({ message: 'Not implemented yet' });
+  const orgId = (req as any).userId; // TODO
+  const data = req.body;
+  const result = await taskService.updateTask(req.params.id, orgId, data);
+  res.json(result);
 }));
 
-/** PATCH /tasks/:id/status - 推进任务状态 */
+/** PATCH /tasks/:id/status */
 taskRoutes.patch('/:id/status', asyncHandler(async (req, res) => {
-  // TODO: Phase 1 实现
-  res.json({ message: 'Not implemented yet' });
+  const orgId = (req as any).userId; // TODO
+  const { status, comment } = transitionSchema.parse(req.body);
+  const userId = (req as any).userId;
+  const result = await taskService.transitionStatus(req.params.id, orgId, status as any, userId, comment);
+  res.json(result);
 }));
