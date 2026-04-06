@@ -17,6 +17,7 @@ export const queryKeys = {
   samples: (taskId: string) => ['samples', taskId] as const,
   regulations: (page?: number) => ['regulations', page] as const,
   regulation: (id: string) => ['regulation', id] as const,
+  plan: (taskId: string) => ['plan', taskId] as const,
 };
 
 // ── Scenario Hooks ──
@@ -162,5 +163,38 @@ export function useSubmitPaper() {
   return useMutation({
     mutationFn: (taskId: string) => api.post(`/tasks/${taskId}/paper/submit`),
     onSuccess: (_data, taskId) => qc.invalidateQueries({ queryKey: queryKeys.task(taskId) }),
+  });
+}
+
+// ── Plan Hooks ──
+export function usePlan(taskId: string) {
+  return useQuery({
+    queryKey: queryKeys.plan(taskId),
+    queryFn: () => api.get<any>(`/tasks/${taskId}/plan`),
+    enabled: !!taskId,
+  });
+}
+
+export function useUpdatePlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, ...data }: { taskId: string } & any) =>
+      api.post(`/tasks/${taskId}/plan`, data),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.plan(variables.taskId) });
+      qc.invalidateQueries({ queryKey: queryKeys.task(variables.taskId) });
+    },
+  });
+}
+
+export function useApprovePlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, ...data }: { taskId: string } & any) =>
+      api.post(`/tasks/${taskId}/plan/approve`, data),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.plan(variables.taskId) });
+      qc.invalidateQueries({ queryKey: queryKeys.task(variables.taskId) });
+    },
   });
 }

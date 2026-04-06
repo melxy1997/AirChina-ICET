@@ -2,7 +2,9 @@ import type { TaskStatus } from '@icet/shared';
 import { ALLOWED_TRANSITIONS, TASK_STATUS_LABELS } from '@icet/shared';
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import PlanTab from '@/components/PlanTab';
 import { downloadFile } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import type { SampleView } from '@/lib/api-types';
 import {
   useGeneratePaper,
@@ -14,11 +16,12 @@ import {
 
 export default function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const { data: task, isLoading } = useTask(id!);
   const { data: sampleData } = useSamples(id!);
   const transitionStatus = useTransitionStatus();
   const generatePaper = useGeneratePaper();
-  const [tab, setTab] = useState<'info' | 'samples' | 'paper'>('info');
+  const [tab, setTab] = useState<'info' | 'plan' | 'samples' | 'paper'>('info');
 
   if (isLoading) return <div className="text-gray-500">加载中...</div>;
   if (!task) return <div className="text-red-500">任务不存在</div>;
@@ -59,14 +62,14 @@ export default function TaskDetailPage() {
       </div>
 
       <div className="flex gap-1 mb-4 border-b">
-        {(['info', 'samples', 'paper'] as const).map((t) => (
+        {(['info', 'plan', 'samples', 'paper'] as const).map((t) => (
           <button
             type="button"
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm ${tab === t ? 'border-b-2 border-blue-600 text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
           >
-            {{ info: '基本信息', samples: '样本与执行', paper: '工作底稿' }[t]}
+            {{ info: '基本信息', plan: '测试计划', samples: '样本与执行', paper: '工作底稿' }[t]}
           </button>
         ))}
       </div>
@@ -114,6 +117,14 @@ export default function TaskDetailPage() {
             </div>
           )}
         </div>
+      )}
+
+      {tab === 'plan' && (
+        <PlanTab
+          taskId={id!}
+          isReviewer={user?.role === 'REVIEWER' || user?.id === task.reviewerId}
+          currentStatus={task.status}
+        />
       )}
 
       {tab === 'samples' && (

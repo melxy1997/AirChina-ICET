@@ -33,11 +33,18 @@ export interface TaskDetailApi {
   completionDate?: string | null;
   scenario?: { processLevel1?: string; processLevel2?: string };
   tester?: { name?: string };
-  reviewer?: { name?: string };
+  reviewer?: { id?: string; name?: string };
+  reviewerId?: string | null;
   plan?: {
+    id: string;
     controlDescription?: string;
-    steps?: { id: string; description: string }[];
-  };
+    controlIds?: string[];
+    reviewStatus?: string;
+    reviewedBy?: string | null;
+    reviewedAt?: string | null;
+    reviewComment?: string | null;
+    steps?: { id: string; index: number; description: string; executionConfig: any }[];
+  } | null;
 }
 
 export interface StepExecutionView {

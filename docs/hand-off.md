@@ -517,13 +517,6 @@ icet/
 | @aws-sdk/s3-request-presigner | ^3.700.0 | apps/api |
 | @tanstack/react-query | ^5.62.0 | apps/web |
 
-#### 待验证项
-
-- [ ] `pnpm install` 安装新增依赖
-- [ ] `pnpm --filter @icet/api build` 后端编译通过
-- [ ] `pnpm --filter @icet/web build` 前端编译通过
-- [ ] `node apps/api/tests/api.test.mjs` 测试脚本全部通过（MinIO 相关测试需要 docker compose up）
-
 #### 当前弱点与改进记录
 
 > 以下问题在 Phase 1 补丁中已修复
@@ -604,6 +597,33 @@ icet/
 ├── .npmrc                             # node-linker=hoisted
 └── .env.example
 ```
+
+### ✅ 测试计划人工填写功能（已完成）
+
+> 完成时间：2026-04-06
+> 分支：`feature/solo`
+
+#### 完成内容
+
+| 模块 | 说明 |
+|------|------|
+| 后端 Service | `plan.service.ts` 实现 TestPlan 和 TestStep 的 CRUD，支持审核逻辑与状态自动流转 |
+| 后端 Routes | `plan.routes.ts` 提供 `GET/POST /tasks/:id/plan` 及 `POST /tasks/:id/plan/approve` 接口 |
+| 前端 组件 | `PlanTab.tsx` 实现步骤编辑器，支持增删改、排序及执行配置选择 |
+| 前端 页面 | `TaskDetailPage.tsx` 集成测试计划 Tab，根据角色（执行人/审阅人）动态控制权限 |
+
+#### 实现细节
+
+**后端 — 测试计划服务**：
+- **CRUD 逻辑**：支持 `upsert` 测试计划，并同步更新测试步骤。
+- **状态流转**：创建计划自动流转至 `PLANNING`；审核通过流转至 `EXECUTING`；审核退回流转至 `PLANNING`。
+- **权限校验**：严格校验 `organizationId`。
+
+**前端 — 步骤编辑器**：
+- **交互**：支持实时添加、删除、上下移动排序。
+- **配置**：支持选择 `checkType`（签名/日期/金额/内容/人工）。
+- **审核流**：审阅人支持一键审核通过或退回并填写意见。
+- **状态管理**：集成 TanStack Query 保证数据一致性。
 
 ### 尚未开始开发
 - **Phase 2**：消息队列（BullMQ + Worker）、WebSocket 进度推送集成、SampleParserAgent、RegulationParserAgent
