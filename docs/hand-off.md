@@ -519,7 +519,7 @@ icet/
 
 #### 当前弱点与改进记录
 
-> 以下问题在 Phase 1 补丁中已修复
+> 以下问题在 Phase 1 补丁及其后续优化中已修复
 
 | 弱点 | 状态 | 修复方式 |
 |------|------|----------|
@@ -529,17 +529,17 @@ icet/
 | **前端无 TanStack Query** | ✅ 已修复 | 迁移全部页面到 @tanstack/react-query，集中 query keys + hooks |
 | **无新建任务页面** | ✅ 已修复 | TaskNewPage：底稿编号 + 测试单位 + 场景选择 + 抽样配置 |
 | **API 无分页参数校验** | ✅ 已修复 | app.ts 中间件 clamp page>=1, pageSize 1-100 |
-| **无请求速率限制** | ✅ 已修复 | 内存级 rate limiter 100 req/min，响应头 X-RateLimit-* |
+| **无请求速率限制** | ✅ 已修复 | 引入 `express-rate-limit` + `rate-limit-redis`，基于 Redis 进行分布式速率限制 |
+| **前端无 loading 骨架屏** | ✅ 已修复 | 引入 `Skeleton` 组件，在数据加载时替代文本提示 |
+| **无 Zustand 状态管理** | ✅ 已修复 | 引入 `zustand` 并在 `TaskListPage` 实现筛选条件的持久化 |
+| **seed 脚本未用 tsx 执行** | ✅ 已修复 | 在 `package.json` 中配置 `prisma.seed` 使用 `tsx` |
+| **rate limiting 基于内存** | ✅ 已修复 | 已迁移到基于 Redis 的速率限制 |
 
 > 以下问题尚未修复
 
 | 弱点 | 说明 | 计划解决时机 |
 |------|------|------------|
-| **前端无 loading 骨架屏** | 数据加载只显示"加载中..."文字 | 引入骨架屏组件 |
-| **无 Zustand 状态管理** | 复杂状态（如任务筛选条件）未持久化 | 按需引入 Zustand store |
-| **seed 脚本未用 tsx 执行** | prisma/seed.ts 使用了 ESM import 但 prisma seed 命令可能需要额外配置 | 在 package.json 中配置 prisma.seed 或直接用 tsx 执行 |
-| **rate limiting 基于内存** | 多实例部署时无法共享计数 | 迁移到 Redis-based rate limiter |
-| **前端无 shadcn/ui 完整组件库** | 当前只有手写 Toast 和 ConfirmDialog | 按需引入 shadcn/ui 组件 |
+| **前端无 shadcn/ui 完整组件库** | 当前只有手写 Toast、ConfirmDialog 和 Skeleton | 按需引入 shadcn/ui 完整组件 |
 
 #### 当前项目结构（Phase 1 后）
 

@@ -1,8 +1,10 @@
 import type { TaskStatus } from '@icet/shared';
 import { TASK_STATUS_LABELS } from '@icet/shared';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import type { TaskListItem } from '@/lib/api-types';
 import { useTasks } from '@/lib/hooks';
+import { useTaskFilterStore } from '@/lib/store';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const statusColor: Record<string, string> = {
   DRAFT: 'bg-gray-100 text-gray-700',
@@ -17,9 +19,9 @@ const statusColor: Record<string, string> = {
 };
 
 export default function TaskListPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const statusFilter = searchParams.get('status') || '';
+  const { status: statusFilter, setStatus } = useTaskFilterStore();
+  
   const filters: Record<string, string> = {};
   if (statusFilter) filters.status = statusFilter;
 
@@ -42,7 +44,7 @@ export default function TaskListPage() {
       <div className="flex gap-2 mb-4 flex-wrap">
         <button
           type="button"
-          onClick={() => setSearchParams({})}
+          onClick={() => setStatus('')}
           className={`px-3 py-1 rounded text-sm ${!statusFilter ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
         >
           全部
@@ -51,7 +53,7 @@ export default function TaskListPage() {
           <button
             type="button"
             key={key}
-            onClick={() => setSearchParams({ status: key })}
+            onClick={() => setStatus(key)}
             className={`px-3 py-1 rounded text-sm ${statusFilter === key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
           >
             {label}
@@ -60,7 +62,13 @@ export default function TaskListPage() {
       </div>
 
       {isLoading ? (
-        <div className="text-gray-500">加载中...</div>
+        <div className="bg-white rounded-lg shadow overflow-hidden p-4 space-y-4">
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+        </div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <table className="w-full text-sm">
