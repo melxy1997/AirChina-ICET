@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.middleware.js';
 import { AppError, asyncHandler } from '../middleware/error.middleware.js';
 import * as executionService from '../services/execution.service.js';
 import * as sampleService from '../services/sample.service.js';
+import * as aiJobService from '../services/ai-job.service.js';
 
 export const sampleRoutes = Router();
 sampleRoutes.use(requireAuth);
@@ -138,5 +139,31 @@ sampleRoutes.post(
       items.map((item) => ({ ...item, executedBy: userId })),
     );
     res.json(result);
+  }),
+);
+
+/** POST /tasks/:id/samples/:sid/parse - 触发 AI 解析样本 */
+sampleRoutes.post(
+  '/:id/samples/:sid/parse',
+  asyncHandler(async (req, res) => {
+    const orgId = req.orgId!;
+    await verifyTaskOrg(req.params.id, orgId);
+    const sampleId = paramStr(req.params.sid);
+    if (!sampleId) throw new AppError(400, '无效的样本 ID');
+
+    const sample = await prisma.sample.findUnique({
+      where: { id: sampleId },
+      include: { sampleSet: { select: { taskId: true } } },
+    });
+    if (!sample) throw new AppError(404, '样本不存在');
+
+    const job = await aiJobService.createJob(
+      'PARSE_SAMPLE',
+      'Sample',
+      sampleId,
+      'SAMPLE_PARSER',
+    );
+
+    res.status(202).json({ jobId: job.id });
   }),
 );

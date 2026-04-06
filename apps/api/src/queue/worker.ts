@@ -1,4 +1,5 @@
 import { Worker } from 'bullmq';
+import { prisma } from '../db/prisma.js';
 import { redis } from '../lib/redis.js';
 import * as aiJobService from '../services/ai-job.service.js';
 import type { AIJobPayload } from './ai-job.queue.js';
@@ -10,13 +11,10 @@ export function startWorker(): Worker<AIJobPayload> {
       const { jobId, type, entityId } = job.data;
 
       // Mark job as RUNNING
-      await redis.hset('ignored', 'ignored', 'ignored'); // no-op; just using the import
-      const dbJob = await import('../db/prisma.js').then(({ prisma }) =>
-        prisma.aIJob.update({
-          where: { id: jobId },
-          data: { status: 'RUNNING', startedAt: new Date() },
-        }),
-      );
+      await prisma.aIJob.update({
+        where: { id: jobId },
+        data: { status: 'RUNNING', startedAt: new Date() },
+      });
 
       try {
         switch (type) {
