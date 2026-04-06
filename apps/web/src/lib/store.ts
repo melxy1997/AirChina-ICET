@@ -20,6 +20,6 @@ export const useTaskFilterStore = create<TaskFilterState>()(
     }),
     {
       name: 'icet-task-filters',
-    }
-  )
+    },
+  ),
 );

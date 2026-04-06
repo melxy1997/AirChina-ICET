@@ -1,8 +1,8 @@
 import cors from 'cors';
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { rateLimit } from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
 import { redis } from './lib/redis.js';
 import { errorHandler } from './middleware/error.middleware.js';

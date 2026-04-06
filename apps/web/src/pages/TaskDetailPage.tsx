@@ -3,9 +3,10 @@ import { ALLOWED_TRANSITIONS, TASK_STATUS_LABELS } from '@icet/shared';
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import PlanTab from '@/components/PlanTab';
+import { Skeleton } from '@/components/ui/skeleton';
 import { downloadFile } from '@/lib/api';
-import { useAuth } from '@/lib/auth';
 import type { SampleView } from '@/lib/api-types';
+import { useAuth } from '@/lib/auth';
 import {
   useGeneratePaper,
   useSamples,
@@ -13,7 +14,6 @@ import {
   useTransitionStatus,
   useUpdateStepResult,
 } from '@/lib/hooks';
-import { Skeleton } from '@/components/ui/skeleton';
 
 export default function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();

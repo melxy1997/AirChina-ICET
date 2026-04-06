@@ -1,10 +1,10 @@
 import type { TaskStatus } from '@icet/shared';
 import { TASK_STATUS_LABELS } from '@icet/shared';
 import { useNavigate } from 'react-router-dom';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { TaskListItem } from '@/lib/api-types';
 import { useTasks } from '@/lib/hooks';
 import { useTaskFilterStore } from '@/lib/store';
-import { Skeleton } from '@/components/ui/skeleton';
 
 const statusColor: Record<string, string> = {
   DRAFT: 'bg-gray-100 text-gray-700',
@@ -21,7 +21,7 @@ const statusColor: Record<string, string> = {
 export default function TaskListPage() {
   const navigate = useNavigate();
   const { status: statusFilter, setStatus } = useTaskFilterStore();
-  
+
   const filters: Record<string, string> = {};
   if (statusFilter) filters.status = statusFilter;
 

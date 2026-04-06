@@ -1,6 +1,6 @@
+import type { StepExecutionConfig, TaskStatus } from '@icet/shared';
 import { prisma } from '../db/prisma.js';
 import { AppError } from '../middleware/error.middleware.js';
-import type { StepExecutionConfig, TaskStatus } from '@icet/shared';
 import { transitionStatus } from './task.service.js';
 
 /**
@@ -66,7 +66,7 @@ export async function createOrUpdatePlan(
 
     // 2. 更新 Steps (先删后增，简单处理)
     await tx.testStep.deleteMany({ where: { planId: plan.id } });
-    
+
     if (data.steps.length > 0) {
       await tx.testStep.createMany({
         data: data.steps.map((step, index) => ({
@@ -124,7 +124,7 @@ export async function approvePlan(
 
   return prisma.$transaction(async (tx) => {
     const newReviewStatus = data.approve ? 'APPROVED' : 'REJECTED';
-    
+
     await tx.testPlan.update({
       where: { id: task.plan!.id },
       data: {
@@ -141,8 +141,8 @@ export async function approvePlan(
     if (task.status === 'PLAN_REVIEW') {
       nextTaskStatus = data.approve ? 'EXECUTING' : 'PLANNING';
     } else if (task.status === 'PLANNING' && data.approve) {
-       // 如果还在 PLANNING 状态就直接通过了，也可以跳过 PLAN_REVIEW 直接去 EXECUTING
-       nextTaskStatus = 'EXECUTING';
+      // 如果还在 PLANNING 状态就直接通过了，也可以跳过 PLAN_REVIEW 直接去 EXECUTING
+      nextTaskStatus = 'EXECUTING';
     }
 
     if (nextTaskStatus) {
