@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
 import type {
+  AIJobView,
   RegulationListItem,
   SampleView,
   ScenarioListItem,
@@ -19,6 +20,7 @@ export const queryKeys = {
   regulation: (id: string) => ['regulation', id] as const,
   plan: (taskId: string) => ['plan', taskId] as const,
   paper: (taskId: string) => ['paper', taskId] as const,
+  aiJob: (jobId: string) => ['ai-job', jobId] as const,
 };
 
 // ── Scenario Hooks ──
@@ -226,6 +228,21 @@ export function useApprovePlan() {
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: queryKeys.plan(variables.taskId) });
       qc.invalidateQueries({ queryKey: queryKeys.task(variables.taskId) });
+    },
+  });
+}
+
+// ── AI Job Hooks ──
+export function useAIJob(jobId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.aiJob(jobId ?? ''),
+    queryFn: () => api.get<AIJobView>(`/ai-jobs/${jobId}`),
+    enabled: !!jobId,
+    refetchInterval: (query) => {
+      const data = query.state.data as AIJobView | undefined;
+      if (!data) return 3000;
+      if (data.status === 'QUEUED' || data.status === 'RUNNING') return 3000;
+      return false;
     },
   });
 }

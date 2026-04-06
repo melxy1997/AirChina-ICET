@@ -77,3 +77,21 @@ export interface RegulationListItem {
   createdAt: string;
   _count?: { controlPoints?: number; scenarios?: number };
 }
+
+export interface AIJobView {
+  id: string;
+  type: string;
+  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  agentType: string;
+  inputEntityType: string;
+  inputEntityId: string;
+  outputEntityType?: string | null;
+  outputEntityId?: string | null;
+  progress?: number | null;
+  currentStep?: string | null;
+  errorMessage?: string | null;
+  tokensUsed?: number | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+}

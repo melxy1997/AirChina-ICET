@@ -19,6 +19,7 @@ import {
   useUpdateStepResult,
   useUpdateTask,
 } from '@/lib/hooks';
+import { useTaskSocket } from '@/hooks/useTaskSocket';
 
 export default function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -28,6 +29,8 @@ export default function TaskDetailPage() {
   const transitionStatus = useTransitionStatus();
   const generatePaper = useGeneratePaper();
   const [tab, setTab] = useState<'info' | 'plan' | 'samples' | 'paper'>('info');
+
+  useTaskSocket(id);
 
   if (isLoading) {
     return (
