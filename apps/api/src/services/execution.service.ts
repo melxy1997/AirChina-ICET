@@ -1,4 +1,5 @@
-import { isValidStepResult } from '@icet/shared';
+import type { EvidenceItem, StepResultValue } from '@icet/shared';
+import { isValidStepResult, SYSTEM_USER_ID } from '@icet/shared';
 import { prisma } from '../db/prisma.js';
 import { AppError } from '../middleware/error.middleware.js';
 
@@ -46,4 +47,46 @@ export async function batchUpdateResults(
 ) {
   const results = await Promise.all(items.map((item) => updateStepResult(item)));
   return { updated: results.length };
+}
+
+/**
+ * 当步骤执行结果为 × 时，自动创建异常记录
+ */
+export async function createAnomalyFromExecution(
+  execution: {
+    id: string;
+    sampleId: string;
+    stepId: string;
+    result: StepResultValue;
+    aiReasoning?: string;
+  },
+  sampleNo: number,
+  stepIndex: number,
+  taskId: string,
+): Promise<string | null> {
+  if (execution.result !== '×') {
+    return null;
+  }
+
+  // Get the next finding number
+  const existingAnomalies = await prisma.anomalyRecord.count({
+    where: { taskId },
+  });
+  const findingNo = String(existingAnomalies + 1);
+
+  await prisma.anomalyRecord.create({
+    data: {
+      taskId,
+      stepExecutionId: execution.id,
+      findingNo,
+      description: execution.aiReasoning || '待填写',
+      stepNo: `步骤${stepIndex}`,
+      sampleNo: String(sampleNo),
+      supportingDoc: '',
+      status: 'OPEN',
+      createdBy: SYSTEM_USER_ID,
+    },
+  });
+
+  return findingNo;
 }

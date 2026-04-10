@@ -1,10 +1,22 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSocket } from '@/lib/socket';
 import { queryKeys } from '@/lib/hooks';
 
-export function useTaskSocket(taskId: string | undefined) {
+interface TaskSocketState {
+  progress: number;
+  currentStep?: string;
+  status: 'idle' | 'running' | 'completed' | 'failed';
+  jobId: string | null;
+}
+
+export function useTaskSocket(taskId: string | undefined): TaskSocketState & { refetch: () => void } {
   const queryClient = useQueryClient();
+  const [state, setState] = useState<TaskSocketState>({
+    progress: 0,
+    status: 'idle',
+    jobId: null,
+  });
 
   useEffect(() => {
     if (!taskId) return;
@@ -17,19 +29,28 @@ export function useTaskSocket(taskId: string | undefined) {
       jobId: string;
       progress: number;
       currentStep?: string;
+      inputEntityId?: string;
     }) => {
+      setState({
+        jobId: data.jobId,
+        progress: data.progress,
+        currentStep: data.currentStep,
+        status: 'running',
+      });
       queryClient.setQueryData(['ai-job', data.jobId], (old: unknown) =>
         old ? { ...(old as object), ...data } : data,
       );
     };
 
     const handleCompleted = (data: { jobId: string }) => {
+      setState((prev) => ({ ...prev, status: 'completed', progress: 100 }));
       queryClient.invalidateQueries({ queryKey: ['ai-job', data.jobId] });
       queryClient.invalidateQueries({ queryKey: queryKeys.task(taskId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.samples(taskId) });
     };
 
-    const handleFailed = (data: { jobId: string }) => {
+    const handleFailed = (data: { jobId: string; error?: string }) => {
+      setState((prev) => ({ ...prev, status: 'failed' }));
       queryClient.invalidateQueries({ queryKey: ['ai-job', data.jobId] });
     };
 
@@ -50,4 +71,6 @@ export function useTaskSocket(taskId: string | undefined) {
       socket.off('task.status_changed', handleStatusChanged);
     };
   }, [taskId, queryClient]);
+
+  return { ...state, refetch: () => setState({ progress: 0, status: 'idle', jobId: null }) };
 }

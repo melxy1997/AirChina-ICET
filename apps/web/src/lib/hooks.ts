@@ -268,3 +268,27 @@ export function useParseSample() {
     },
   });
 }
+
+export function useGeneratePlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (taskId: string) =>
+      api.post<{ jobId: string }>(`/tasks/${taskId}/plan/generate`),
+    onSuccess: (_data, taskId) => {
+      qc.invalidateQueries({ queryKey: queryKeys.plan(taskId) });
+      qc.invalidateQueries({ queryKey: queryKeys.task(taskId) });
+    },
+  });
+}
+
+export function useRunAllExecutions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (taskId: string) =>
+      api.post<{ jobId: string }>(`/tasks/${taskId}/executions/run-all`),
+    onSuccess: (_data, taskId) => {
+      qc.invalidateQueries({ queryKey: queryKeys.samples(taskId) });
+      qc.invalidateQueries({ queryKey: queryKeys.task(taskId) });
+    },
+  });
+}

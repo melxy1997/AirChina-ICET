@@ -167,3 +167,38 @@ sampleRoutes.post(
     res.status(202).json({ jobId: job.id });
   }),
 );
+
+/** POST /tasks/:id/executions/run-all - 触发 AI 全量执行所有样本×步骤 */
+sampleRoutes.post(
+  '/:id/executions/run-all',
+  asyncHandler(async (req, res) => {
+    const orgId = req.orgId!;
+    const task = await verifyTaskOrg(req.params.id, orgId);
+    const taskId = paramStr(req.params.id);
+
+    if (!taskId) throw new AppError(400, '无效的任务 ID');
+
+    // Validate task has an approved plan
+    const taskWithPlan = await prisma.testTask.findUnique({
+      where: { id: taskId },
+      include: { plan: { include: { steps: true } } },
+    });
+
+    if (!taskWithPlan?.plan) {
+      throw new AppError(400, '测试计划尚未创建，请先生成测试计划');
+    }
+
+    if (taskWithPlan.plan.reviewStatus !== 'APPROVED') {
+      throw new AppError(400, '测试计划尚未审核通过，请先审核后再执行');
+    }
+
+    const job = await aiJobService.createJob(
+      'EXECUTE_ALL_STEPS',
+      'TestTask',
+      taskId,
+      'TEST_EXECUTOR',
+    );
+
+    res.status(202).json({ jobId: job.id });
+  }),
+);

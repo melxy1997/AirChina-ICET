@@ -828,7 +828,232 @@ packages/shared/src/types/
 
 ---
 
-## 九、项目约定与关键决策记录
+## 九、Phase 3：核心 AI Agent（已完成）
+
+> 完成时间：2026-04-10
+> 分支：`feature/solo`
+> 对应开发计划：`dev-plan.md#L1239-1580`（Phase 3 — 3-A/3-B/3-C）
+
+### 做了什么
+
+1. **PlanGeneratorAgent** — AI 自动生成测试计划（基于控制点列表 → 测试步骤列表）
+2. **TestExecutorAgent** — 核心 AI 执行引擎（plan → execute → judge 三节点状态图）
+3. **5 个 Agent 工具** — 文本搜索、签名检查、字段提取、值比较、完整性检查
+4. **批量执行器** — 并发执行所有样本×步骤组合，自动创建异常记录
+5. **前端执行矩阵** — ExecutionMatrix + ResultCell + EvidenceDrawer + RunAllButton
+6. **WebSocket 进度推送增强** — useTaskSocket 返回 progress/status，RunAllButton 实时进度条
+
+### 怎么实现的
+
+#### 3-A：PlanGeneratorAgent
+
+| 文件 | 说明 |
+|------|------|
+| `agents/plan-generator/generator.chain.ts` | LLM Prompt 模板 + `generatePlan()` 函数，JSON mode 调用 LLM 生成结构化的测试计划 |
+| `agents/plan-generator/index.ts` | `runPlanGenerator()` 主流程：加载任务→收集控制点→调用 LLM→事务 upsert plan+steps→状态流转到 PLAN_REVIEW |
+| `routes/plan.routes.ts` | `POST /tasks/:id/plan/generate` 路由，校验规章制度已解析，创建 AI 任务 |
+| `lib/hooks.ts` (web) | 新增 `useGeneratePlan()` hook |
+
+**核心链路**：
+```
+用户点击「AI生成计划」
+  → POST /tasks/:id/plan/generate
+  → 校验：任务有关联规章 + 规章已完成解析
+  → 创建 AIJob (GENERATE_TEST_PLAN)
+  → Worker 接收任务
+  → runPlanGenerator():
+      1. 加载 task.taskRegulations → controlPoints
+      2. 格式化控制点为 LLM prompt（含 controlId/title/description/approvalChain/suggestedSteps）
+      3. LLM 返回 JSON: { controlDescription, controlIds, steps[] }
+      4. 事务 upsert TestPlan + TestStep（删除旧步骤→创建新步骤）
+      5. 状态 PLANNING → PLAN_REVIEW
+  → completeJob → WebSocket 推送 → 前端自动刷新
+```
+
+#### 3-B：TestExecutorAgent
+
+| 文件 | 说明 |
+|------|------|
+| `agents/test-executor/tools/search-text.tool.ts` | 文本搜索工具，支持跨页搜索、上下文片段提取 |
+| `agents/test-executor/tools/check-signature.tool.ts` | 签名检查工具，fuzzy match signerRole 与 parsedContent.signatures |
+| `agents/test-executor/tools/extract-field.tool.ts` | 字段提取工具，从 parsedContent.dates/amounts 中按 fieldName 查找 |
+| `agents/test-executor/tools/compare-values.tool.ts` | 值比较工具，支持数值/字符串比较，容差参数 |
+| `agents/test-executor/tools/check-document-completeness.tool.ts` | 完整性检查工具，遍历 parsedContent 验证必需字段是否存在 |
+| `agents/test-executor/graph.ts` | 状态图核心实现：plan_node → execute_node(循环) → judge_node |
+| `agents/test-executor/step-executor.ts` | 单步执行入口 `executeStep()` |
+| `agents/test-executor/batch-executor.ts` | 批量执行 `runTestExecutor()`，自定义 Limiter 类实现并发控制 |
+| `agents/test-executor/index.ts` | barrel export |
+| `services/execution.service.ts` | 新增 `createAnomalyFromExecution()` |
+| `routes/samples.routes.ts` | `POST /tasks/:id/executions/run-all` 路由 |
+| `queue/worker.ts` | 新增 EXECUTE_STEP / EXECUTE_ALL_STEPS 处理 |
+
+**Graph 三节点详解**：
+
+```
+plan_node（规划）:
+  输入: TestStep + SampleParsedContent
+  LLM Prompt: "基于步骤要求和文档结构化信息，制定3-5个检查子任务"
+  输出: executionPlan: string[]（如 ["检查总经理签字", "搜索审批日期", "核对金额一致性"]）
+
+execute_node（执行）:
+  输入: executionPlan[planStepIndex] + executionConfig
+  根据 checkType 自动调用对应工具:
+    SIGNATURE_PRESENCE → checkSignature(role, parsedContent)
+    CONTENT_EXISTENCE → searchText(keyword, pages)
+    DATE_VALIDITY → extractField(fieldName, 'date', parsedContent)
+    AMOUNT_MATCH → extractField(fieldName, 'amount', parsedContent)
+    DOCUMENT_COMPLETENESS → checkCompleteness(fields, parsedContent)
+    FREE_FORM_AI → 从 prompt/expectedEvidence 中提取关键词搜索
+  若未匹配任何工具，从步骤描述中自动提取关键词搜索
+  输出: toolCallHistory 追加记录
+
+judge_node（裁判）:
+  输入: step.description + 完整 toolCallHistory
+  LLM Prompt: "综合所有工具调用结果，判断步骤是否通过"
+  输出: result(✓/×/N/A) + reasoning + confidence(0-1) + evidence[]
+  Fallback: 如果 LLM JSON 解析失败，根据工具输出关键词自动判断
+    (含"未找到"/"缺少" → ×, 含"找到"/"存在" → ✓)
+```
+
+**批量执行流程**：
+```
+用户点击「AI 全量执行」
+  → POST /tasks/:id/executions/run-all
+  → 校验：测试计划已审核通过 (reviewStatus === 'APPROVED')
+  → 创建 AIJob (EXECUTE_ALL_STEPS)
+  → Worker 接收任务
+  → runTestExecutor():
+      1. 加载 plan.steps + samples（含 parsedContent）
+      2. 构建样本×步骤笛卡尔积，跳过人工已完成的结果
+      3. Limiter(concurrency=3) 并发执行:
+         for each {sample, step}:
+           executeStep(step, sample, parsedContent)
+           → upsert StepExecution
+           → 如果结果为 ×，自动 createAnomalyFromExecution
+           → 更新进度百分比
+      4. 状态 EXECUTING → EXEC_REVIEW
+  → completeJob → WebSocket 推送 → 前端刷新
+```
+
+**并发控制**：未引入 p-limit 依赖，手写了一个简单的 `Limiter` 类（基于 Promise 队列），避免新增依赖：
+```typescript
+class Limiter {
+  private running = 0;
+  private queue: Array<() => void> = [];
+  async run<T>(fn: () => Promise<T>): Promise<T> { ... }
+}
+```
+
+#### 3-C：前端组件
+
+| 文件 | 说明 |
+|------|------|
+| `components/execution-matrix/ExecutionMatrix.tsx` | 矩阵主组件：表头=步骤列，每行=样本数据+ResultCell，底部=统计栏 |
+| `components/execution-matrix/ResultCell.tsx` | 结果单元格：显示 ✓/×/N/A + AI 置信度徽标 + 人工覆盖下拉框 + 证据查看按钮 |
+| `components/execution-matrix/EvidenceDrawer.tsx` | 侧滑面板：AI 推理过程、置信度进度条、证据列表（带颜色标识）、折叠的工具调用历史、人工备注输入 |
+| `components/execution-matrix/RunAllButton.tsx` | 全量执行按钮：点击触发 API → 轮询 AIJob 状态 → 显示进度条 + 当前步骤 |
+| `hooks/useTaskSocket.ts` | 增强：返回 `{ progress, currentStep, status, jobId, refetch }` |
+| `lib/hooks.ts` | 新增 `useGeneratePlan()` 和 `useRunAllExecutions()` |
+
+**组件间数据流**：
+```
+ExecutionMatrix (接收 samples + planSteps)
+  ├─ 为每个 sample×step 渲染 ResultCell
+  ├─ ResultCell 点击「查看证据」→ 打开 EvidenceDrawer
+  ├─ ResultCell 下拉选择 → 调用 onOverride → updateStepResult mutation
+  └─ 页面顶部渲染 RunAllButton → 触发全量执行 → WebSocket 进度条
+```
+
+### 遇到什么问题 怎么解决的
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| `search-text.tool.ts` 找不到 `../../types/ai.js` | 初始 import 路径错误，PageContent 类型实际定义在 `pdf-extractor.ts` 中 | 修正为 `import type { PageContent } from '../../tools/pdf-extractor.js'` |
+| `DetectedDate` / `DetectedAmount` 无 `label` 字段 | 实体类型定义中这两个接口只有 `fieldContext` 和 `value`，没有 `label` | 移除所有对 `.label` 的引用，改用 `.fieldContext` |
+| `SearchResult.matches` 无 `contextBefore`/`contextAfter` 字段 | `searchText` 返回类型中 `matches` 元素只有 `{ page, snippet }` | 在 `extract-field.tool.ts` 中改用 `snippet` 作为 context |
+| plan-generator `step.index` 类型错误 | LLM 返回类型中 `steps[].index` 存在，但经过 `result.steps.map()` 后的新数组元素类型丢失 `index` | 改用 `map` 的回调索引 `idx` 作为 `index: idx + 1` |
+| plan.routes `checkType` 类型不兼容 | Zod schema 中 `checkType: z.string()` 推断为 `string`，不是 `StepCheckType` | 改为 `z.string() as z.ZodType<StepCheckType>` |
+| batch-executor `StepExecutionConfig` cast 报错 | Prisma JSON 字段是 `JsonValue`，与 `StepExecutionConfig` 不兼容 | 双重 cast `as unknown as StepExecutionConfig` |
+| batch-executor `Sample` 类型转换报错 | Prisma Date 字段与共享包中的 `Timestamp` (string) 类型不匹配 | `uploadedAt.toISOString()` 转换 + `as unknown as Sample` |
+| EvidenceDrawer `Type 'unknown' is not assignable to type 'ReactNode'` | TypeScript strict mode 下 `aiEvidence?: unknown` 字段传播到 JSX 条件渲染，TS 无法确定类型安全；`&&` 条件渲染在 strict 模式下返回 `boolean \| ReactElement \| unknown` | 1. 改用 `?: null` 三元表达式替代 `&&` 渲染<br>2. 抽离为独立函数并显式标注 `React.ReactNode` 返回类型<br>3. `Array.isArray()` 类型守卫 + `as EvidenceItem[]` 强制转换<br>**注**：最终只剩 1 个非阻塞 tsc strict mode 错误，`vite build` 实际编译通过，不影响运行 |
+| 前端 `StepExecutionView` 只有 stepId + result | 现有 API 返回的 `StepExecutionView` 接口非常精简，不包含 executedBy/aiConfidence/aiEvidence 等字段 | ExecutionMatrix 中构造 `ExecutionData` 对象时填充默认值；完整执行详情展示依赖后续 API enrichment（当前显示基础结果） |
+| 未引入 LangGraph 依赖 | `@langchain/langgraph` 和 `langchain` 未在 package.json 中安装 | 采用自定义状态机实现（`executeGraph` 函数），不依赖 LangGraph 库；代码结构保持与 LangGraph 一致的节点抽象，后续安装 LangGraph 后可平滑迁移 |
+
+### 架构决策记录
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| TestExecutor 图结构 | 自定义 `executeGraph()` 函数（非 LangGraph） | LangGraph 尚未安装；当前实现保持节点抽象一致，后续可直接替换为 LangGraph 而不影响业务逻辑 |
+| 并发控制 | 手写 `Limiter` 类（而非 p-limit） | 避免新增运行时依赖；实现仅 ~15 行代码 |
+| 失败降级 | LLM JSON 解析失败 → 基于工具输出关键词自动判断 | 保证执行链路不因 LLM 格式输出而中断；Fallback 逻辑可覆盖大部分简单场景 |
+| 异常自动创建 | 步骤执行结果为 `×` 时，`createAnomalyFromExecution` 自动创建 AnomalyRecord | 无需前端额外代码；异常与 StepExecution 通过 `stepExecutionId` 关联，`findingNo` 自动递增 |
+| 前端类型对齐 | 共享 `ExecutionDisplayData` 接口（ResultCell 导出），ExecutionMatrix/EvidenceDrawer 统一使用 | 避免三个组件各自定义重复类型；单一数据源，修改一处即生效 |
+
+### 当前已就绪的 Phase 3 能力
+
+| 能力 | API 端点 / 组件 | 状态 |
+|------|-----------------|------|
+| AI 生成测试计划 | `POST /tasks/:id/plan/generate` | ✅ |
+| PlanGeneratorAgent | `agents/plan-generator/` | ✅ |
+| TestExecutorAgent 图引擎 | `agents/test-executor/graph.ts` | ✅ |
+| 5 个 Agent 工具 | `agents/test-executor/tools/` | ✅ |
+| 单步执行 | `executeStep()` | ✅ |
+| 批量执行 | `POST /tasks/:id/executions/run-all` | ✅ |
+| 异常自动创建 | `createAnomalyFromExecution()` | ✅ |
+| Worker 支持执行任务 | `queue/worker.ts` | ✅ |
+| 执行矩阵 UI | `ExecutionMatrix` + `ResultCell` | ✅ |
+| 证据查看面板 | `EvidenceDrawer` | ✅ |
+| 全量执行按钮+进度条 | `RunAllButton` | ✅ |
+| WebSocket 进度追踪 | `useTaskSocket` 增强 | ✅ |
+
+### 当前项目结构（Phase 3 后）
+
+```
+apps/api/src/
+├── agents/
+│   ├── plan-generator/                  ← Phase 3 新增
+│   │   ├── generator.chain.ts           LLM prompt + generatePlan()
+│   │   └── index.ts                     runPlanGenerator()
+│   ├── test-executor/                   ← Phase 3 新增
+│   │   ├── graph.ts                     plan_node / execute_node / judge_node
+│   │   ├── step-executor.ts             executeStep()
+│   │   ├── batch-executor.ts            runTestExecutor() + Limiter
+│   │   ├── index.ts                     barrel export
+│   │   └── tools/
+│   │       ├── search-text.tool.ts
+│   │       ├── check-signature.tool.ts
+│   │       ├── extract-field.tool.ts
+│   │       ├── compare-values.tool.ts
+│   │       └── check-document-completeness.tool.ts
+│   ├── sample-parser/                   ← Phase 2
+│   └── regulation-parser/               ← Phase 2
+├── services/
+│   ├── execution.service.ts             ← Phase 3 新增 createAnomalyFromExecution()
+│   └── ai-job.service.ts
+├── routes/
+│   ├── plan.routes.ts                   ← Phase 3 新增 POST /plan/generate
+│   └── samples.routes.ts                ← Phase 3 新增 POST /executions/run-all
+├── queue/
+│   └── worker.ts                        ← Phase 3 新增 GENERATE_TEST_PLAN / EXECUTE_* 处理
+
+apps/web/src/
+├── components/execution-matrix/         ← Phase 3 全部新增
+│   ├── index.ts
+│   ├── ExecutionMatrix.tsx              矩阵主组件
+│   ├── ResultCell.tsx                   结果单元格 + 执行显示数据接口
+│   ├── EvidenceDrawer.tsx               侧滑证据面板
+│   └── RunAllButton.tsx                 全量执行按钮 + 进度条
+├── hooks/
+│   └── useTaskSocket.ts                 ← Phase 3 增强：返回 progress/status
+└── lib/
+    └── hooks.ts                         ← Phase 3 新增 useGeneratePlan / useRunAllExecutions
+```
+
+---
+
+## 十、项目约定与关键决策记录
+
+### 10.1 基础约定（Phase 0-1 确立）
 
 | 约定 | 内容 |
 |------|------|
@@ -843,44 +1068,142 @@ packages/shared/src/types/
 | **断点续传** | LangGraph使用SQLite Checkpointer，与主数据库隔离 |
 | **系统用户** | AI操作使用`SYSTEM_USER_ID`（环境变量），标识非人工操作 |
 | **错误处理** | 所有async controller用`asyncHandler`包装，统一走`errorMiddleware` |
-| **状态机** | 状态转换规则集中在`task-state-machine.ts`，服务层强制校验 |
-| **步骤同步** | 新增/删除TestStep时，自动同步所有现有Sample的StepExecution记录 |
+| **状态机** | 状态转换规则集中在`@icet/shared`的`ALLOWED_TRANSITIONS`，服务层强制校验 |
+
+### 10.2 Phase 2 新增决策
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| LLM SDK | 直接调用 openai（非 LangChain） | Phase 2 只需简单 prompt→response 链；Phase 3 引入 LangGraph 时再统一 |
+| Worker 部署模式 | 同进程（main.ts 调用 `startWorker()`） | 开发阶段一个 `pnpm dev` 即可；共享 Prisma 和 Socket.IO 实例；生产时可拆分到独立进程 |
+| PDF 解析 | pdf-parse，不做 OCR | 基础文本提取已满足需求；扫描件 OCR（Tesseract）留到后续 Phase |
+| WebSocket 房间 | task 用 `task:${taskId}`，regulation 用 `regulation:${regulationId}` | Regulation 是组织级资源，不隶属于某个 Task，分开房间更精准 |
+| BullMQ 连接 | 复用 `lib/redis.ts` 单例 | 已有 `maxRetriesPerRequest: null`（BullMQ 硬性要求），无需额外配置 |
+| Worker 动态 import | `await import('../agents/...')` | 避免 main.ts 启动时加载所有 agent 代码；agent 模块可独立替换 |
+
+### 10.3 Phase 3 新增决策
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| TestExecutor 图结构 | 自定义 `executeGraph()` 函数（非 LangGraph） | LangGraph 尚未安装；当前实现保持节点抽象一致，后续安装后可平滑迁移 |
+| 并发控制 | 手写 `Limiter` 类（而非 p-limit） | 避免新增运行时依赖；实现仅 ~15 行代码 |
+| 失败降级 | LLM JSON 解析失败 → 基于工具输出关键词自动判断 | 保证执行链路不因 LLM 格式输出而中断 |
+| 异常自动创建 | 步骤执行结果为 `×` 时自动创建 AnomalyRecord | 无需前端额外代码；`findingNo` 自动递增 |
+| 前端类型对齐 | 共享 `ExecutionDisplayData` 接口（ResultCell 导出） | 避免三个组件各自定义重复类型；单一数据源 |
+| 执行计划校验 | `run-all` 前必须 `reviewStatus === 'APPROVED'` | 防止未经人工审核的 AI 计划直接执行 |
 
 ---
 
-## 十、接手后的第一步建议
+## 十一、接手后的第一步建议
+
+### 11.1 本地环境搭建
 
 ```
-1. 先理解Excel底稿格式
-   打开已实现的 HTML 原型，填写数据，导出Excel
-   对照设计稿截图，理解每个字段在底稿中的位置
-   这是系统所有工作的最终产物，先建立感性认识
+1. 启动基础设施
+   docker compose up -d
+   （PostgreSQL 宿主机端口 5433；Redis 6379；MinIO API 9000 / Console 9001）
 
-2. 搭建本地环境
-   docker compose up -d（启动 PG+Redis+MinIO；PostgreSQL 宿主机端口为 5433）
-   cp .env.example .env && cp .env.example apps/api/.env
+2. 安装依赖
    pnpm install
-   pnpm --filter @icet/api exec prisma migrate dev --name init
 
-3. 从 packages/shared/src/types/ 开始读代码
-   所有业务概念都在这里定义
-   理解每个接口之间的关系
+3. 数据库迁移
+   cp .env.example apps/api/.env
+   pnpm --filter @icet/api exec prisma migrate dev
+   pnpm --filter @icet/api db:seed        ← 创建 3 个测试账号
 
-4. 按Phase 0 → 1顺序开发
-   不要跳过CRUD直接做AI
-   Phase 1完成后整个基础流程可以人工操作跑通
-   Phase 2-3再叠加AI能力
+4. 启动开发服务
+   pnpm dev                               ← 同时启动 API + Web + Worker
+```
 
-5. AI部分从SampleParserAgent开始
-   比TestExecutorAgent简单
-   可以快速验证PDF解析+LLM调用的基础链路是否工作
+### 11.2 验证 Phase 0-3 全链路
+
+```
+1. 登录：admin / admin123（或 tester / tester123）
+2. 创建业务场景 → 上传规章制度 PDF → 触发 AI 解析 → 等待控制点提取完成
+3. 创建测试任务 → 关联规章制度 → AI 生成测试计划 → 审核通过
+4. 添加样本（上传 PDF）→ AI 解析样本 → 等待 parsedContent 就绪
+5. AI 全量执行 → 观察进度条 → 查看执行矩阵结果 → 点击单元格查看证据
+6. 生成工作底稿 → 导出 Excel
+```
+
+### 11.3 代码阅读顺序
+
+```
+1. packages/shared/src/types/             ← 所有业务概念定义
+2. apps/api/prisma/schema.prisma          ← 15 个数据模型，理解关系
+3. apps/api/src/services/                 ← CRUD 业务逻辑
+4. apps/api/src/agents/                   ← AI Agent 核心
+   ├─ regulation-parser/                  ← Phase 2: 规章解析
+   ├─ sample-parser/                      ← Phase 2: 样本解析
+   ├─ plan-generator/                     ← Phase 3: 计划生成
+   └─ test-executor/                      ← Phase 3: 执行引擎（重点）
+       ├─ graph.ts                        ← 三节点状态图
+       ├─ tools/                          ← 5 个 Agent 工具
+       └─ batch-executor.ts               ← 批量执行 + 异常自动创建
+5. apps/web/src/components/execution-matrix/  ← Phase 3 前端组件
+```
+
+### 11.4 下一步开发方向（Phase 4-5）
+
+```
+Phase 4：完整流程打通（1-2周）
+  ├─ 自动生成工作底稿（快照数据 → Excel）
+  ├─ 审阅/批准流程完善
+  ├─ 底稿归档管理
+  └─ Dashboard 统计
+
+Phase 5：优化与完善（持续）
+  ├─ RAG（历史底稿作为参考）
+  ├─ 多模型支持（Claude/本地模型）
+  ├─ 批量任务处理
+  └─ 性能优化
 ```
 
 ---
 
-## 十一、外部依赖与账号清单
+## 十二、外部依赖与账号清单
 
-| 依赖 | 用途 | 获取方式 | 是否必须 |
+### 12.1 基础设施
+
+| 依赖 | 用途 | 本地配置 | 是否必须 |
 |------|------|----------|----------|
-| Docker Desktop / Rancher Desktop | 本地基础设施（PG/Redis/MinIO）；Rancher 需启用 dockerd (moby) | docker.com / rancherdesktop.io | **必须** |
-| Node.js 20 LTS | 运行时 | nodejs.org | **必须** |
+| Docker / Rancher Desktop | 本地基础设施（PG/Redis/MinIO） | docker compose up -d | **必须** |
+| PostgreSQL 16 | 主数据库 | 宿主机端口 5433，用户/库 icet | **必须** |
+| Redis 7 | BullMQ 队列 + 速率限制 | 端口 6379 | **必须** |
+| MinIO | 文件对象存储（S3 兼容） | API 9000 / Console 9001，minioadmin/minioadmin | **必须** |
+
+### 12.2 运行时与开发工具
+
+| 依赖 | 用途 | 版本 | 是否必须 |
+|------|------|------|----------|
+| Node.js | 运行时 | 20 LTS+ | **必须** |
+| pnpm | 包管理器 | workspace | **必须** |
+| Turborepo | Monorepo 构建编排 | turbo.json | **必须** |
+| TypeScript | 类型检查 | 5.7+ | **必须** |
+| Prisma | ORM + 数据库迁移 | 6.2+ | **必须** |
+
+### 12.3 AI 服务
+
+| 依赖 | 用途 | 配置方式 | 是否必须 |
+|------|------|----------|----------|
+| OpenAI 兼容 API | LLM 调用（控制点提取、计划生成、执行判断） | `.env` 中 `OPENAI_API_KEY` + `OPENAI_BASE_URL` | **必须** |
+| 默认模型 | `gpt-4o`（可通过 `LLM_MODEL` 环境变量切换） | `.env` 中 `LLM_MODEL` | 推荐 |
+
+### 12.4 测试账号（seed 脚本创建）
+
+| 邮箱 | 密码 | 角色 | 用途 |
+|------|------|------|------|
+| admin@icet.com | admin123 | ADMIN | 系统管理、用户管理 |
+| tester@icet.com | tester123 | TESTER | 创建任务、上传材料、触发 AI |
+| reviewer@icet.com | reviewer123 | REVIEWER | 审核测试计划、审阅底稿 |
+
+### 12.5 已知待完善项
+
+| 项目 | 说明 | 优先级 |
+|------|------|--------|
+| LangGraph 集成 | 当前 TestExecutor 用自定义 `executeGraph()`，计划后续安装 `@langchain/langgraph` 替换，获得断点续传/可视化等能力 | 中 |
+| `StepExecutionView` API enrichment | 当前前端 API 只返回 `stepId + result`，需扩展返回 executedBy/aiConfidence/aiEvidence 等字段以支持 EvidenceDrawer 完整展示 | 高 |
+| tsc strict mode 1 个非阻塞错误 | `EvidenceDrawer.tsx` 中 `aiEvidence: unknown` 在 JSX 条件渲染下被 TS 标记为 `not assignable to ReactNode`，`vite build` 编译通过，不影响运行 | 低 |
+| shadcn/ui 完整组件库 | 当前只有手写 Toast/ConfirmDialog/Skeleton，可按需引入 shadcn/ui 标准组件 | 低 |
+| 样本解析失败重试 | 当前样本解析失败后无自动重试机制 | 中 |
+| AI 执行结果准确率统计 | 已有 `humanOverride` 标记，但缺少统计 dashboard 分析 AI 准确率 | Phase 5 |

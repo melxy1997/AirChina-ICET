@@ -28,6 +28,17 @@ export function startWorker(): Worker<AIJobPayload> {
             await runRegulationParser(jobId, entityId);
             break;
           }
+          case 'GENERATE_TEST_PLAN': {
+            const { runPlanGenerator } = await import('../agents/plan-generator/index.js');
+            await runPlanGenerator(jobId, entityId);
+            break;
+          }
+          case 'EXECUTE_STEP':
+          case 'EXECUTE_ALL_STEPS': {
+            const { runTestExecutor } = await import('../agents/test-executor/index.js');
+            await runTestExecutor(jobId, entityId, type);
+            break;
+          }
           default:
             throw new Error(`未知的 AI 任务类型: ${type}`);
         }
